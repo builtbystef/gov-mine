@@ -10,7 +10,6 @@ import { institutionListQuery } from "@/features/institutions/queries";
 import { api } from "@/lib/api/server-client";
 import { ALL_ROWS, paged, toSearchString, type SearchParams } from "@/lib/lists";
 import { getQueryClient } from "@/lib/query-client";
-import { getTimeZone } from "@/lib/time-zone/server";
 
 export const metadata: Metadata = { title: "Documents" };
 
@@ -23,7 +22,7 @@ export default function DocumentsPage({ searchParams }: { searchParams: Promise<
 }
 
 async function DocumentsContent({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const [search, timeZone] = await Promise.all([searchParams, getTimeZone()]);
+  const search = await searchParams;
   const filters = parseDocumentSearch(search);
   const queryClient = getQueryClient();
   await Promise.all([
@@ -32,7 +31,7 @@ async function DocumentsContent({ searchParams }: { searchParams: Promise<Search
   ]);
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <DocumentsTable key={toSearchString(filters)} initialFilters={filters} timeZone={timeZone} />
+      <DocumentsTable key={toSearchString(filters)} initialFilters={filters} />
     </HydrationBoundary>
   );
 }

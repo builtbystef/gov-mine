@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatDateTime } from "@/lib/formatting/dates";
+import { formatCalendarDate, formatDateTime } from "@/lib/formatting/dates";
 
 import { documentTypeLabel } from "../schemas";
 import { DocumentRecords } from "./document-records";
@@ -31,7 +31,7 @@ export function DocumentDetail({ document, timeZone }: { document: Document; tim
         }
       />
       <dl className="mb-8 grid gap-3 text-sm md:grid-cols-2">
-        <Detail label="Date">{formatDateTime(document.document_date, timeZone)}</Detail>
+        <Detail label="Date">{formatCalendarDate(document.document_date)}</Detail>
         <Detail label="Parent">
           {document.parent && (
             <Link href={`/documents/${document.parent.id}`} className="hover:underline">

@@ -60,6 +60,15 @@ export function formatDate(iso: string | null | undefined, timeZone: string): st
   return new Intl.DateTimeFormat("en-US", { timeZone, dateStyle: "medium" }).format(new Date(iso));
 }
 
+/**
+ * A calendar date the API sends as midnight UTC ("2026-11-10T00:00:00Z"), such
+ * as a document's date. It is read in UTC, so a zone behind UTC does not show
+ * the day before.
+ */
+export function formatCalendarDate(iso: string | null | undefined): string {
+  return formatDate(iso, "UTC");
+}
+
 export function formatDateTime(iso: string | null | undefined, timeZone: string): string {
   if (!iso) return "";
   return new Intl.DateTimeFormat("en-US", {

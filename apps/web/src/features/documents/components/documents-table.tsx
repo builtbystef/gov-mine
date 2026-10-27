@@ -12,7 +12,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { institutionListQuery } from "@/features/institutions/queries";
 import { useUrlFilters } from "@/hooks/use-url-filters";
 import { browserApi } from "@/lib/api/client";
-import { formatDateTime } from "@/lib/formatting/dates";
+import { formatCalendarDate } from "@/lib/formatting/dates";
 import { ALL_ROWS, paged } from "@/lib/lists";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +26,7 @@ import {
 
 const column = createDataTableColumnHelper<DocumentOutput>();
 
-function documentColumns(timeZone: string) {
+function documentColumns() {
   return column.columns([
     column.accessor("title", {
       header: "Title",
@@ -48,22 +48,14 @@ function documentColumns(timeZone: string) {
     column.accessor("document_date", {
       header: "Date",
       cell: ({ row }) => (
-        <span className="whitespace-nowrap">
-          {formatDateTime(row.original.document_date, timeZone)}
-        </span>
+        <span className="whitespace-nowrap">{formatCalendarDate(row.original.document_date)}</span>
       ),
     }),
   ]);
 }
 
 /** Documents, newest dated first, filtered by institution, type and earliest date. */
-export function DocumentsTable({
-  initialFilters,
-  timeZone,
-}: {
-  initialFilters: DocumentSearch;
-  timeZone: string;
-}) {
+export function DocumentsTable({ initialFilters }: { initialFilters: DocumentSearch }) {
   const [institution, setInstitution] = useState(initialFilters.institution);
   const [type, setType] = useState(initialFilters.type);
   const [since, setSince] = useState(initialFilters.since);
@@ -124,7 +116,7 @@ export function DocumentsTable({
         </label>
       </div>
       <DataTable<DocumentOutput>
-        columns={documentColumns(timeZone)}
+        columns={documentColumns()}
         data={documents.items}
         total={documents.total}
         page={page}
