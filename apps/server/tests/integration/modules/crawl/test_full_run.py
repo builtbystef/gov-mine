@@ -684,6 +684,35 @@ def test_a_full_run_seeds_every_url_of_the_saved_createto_sitemap_at_depth_0(
     assert {found_on[url] for url in listed} == {None}
 
 
+def test_a_link_the_fence_refuses_is_queued_without_its_hosts_lock(
+    crawl_settings: Settings, database: Engine
+):
+    run_id = create_run()
+    sitemap = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        "<url><loc>https://createto.ca/projects</loc></url>"
+        "<url><loc>https://createto.ca/hero.jpg</loc></url>"
+        "<url><loc>https://a-us.storyblok.com/f/1/hero.jpg/m/640x480/smart</loc></url>"
+        "<url><loc>https://a-us.storyblok.com/f/1/minutes.pdf</loc></url>"
+        "</urlset>"
+    )
+    website = Website({SITEMAP: sitemap.encode()})
+
+    seeds = asyncio.run(start(crawl_settings, run_id, website))
+
+    # A refused fetch sends no request, so it need not wait behind the host's: a CDN's
+    # resized images would otherwise hold back its PDFs.
+    domains = {d["name"]: str(d["id"]) for d in rows(database, "SELECT id, name FROM domains")}
+    assert {seed["url"]: seed["lock"] for seed in seeds} == {
+        f"{SITE}/": domains["createto.ca"],
+        f"{SITE}/projects": domains["createto.ca"],
+        f"{SITE}/hero.jpg": None,
+        "https://a-us.storyblok.com/f/1/hero.jpg/m/640x480/smart": None,
+        "https://a-us.storyblok.com/f/1/minutes.pdf": domains["a-us.storyblok.com"],
+    }
+
+
 def test_a_sitemap_url_also_found_as_a_link_is_fetched_once(
     crawl_settings: Settings, database: Engine
 ):

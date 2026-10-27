@@ -190,15 +190,23 @@ async def queue(
     )
 
 
-async def queue_fetch(
-    session: AsyncSession, run_id: uuid.UUID, webpage: uuid.UUID, domain: uuid.UUID, depth: int
+async def queue_fetch(  # noqa: PLR0913 - the job's arguments and its lock
+    session: AsyncSession,
+    run_id: uuid.UUID,
+    webpage: uuid.UUID,
+    domain: uuid.UUID,
+    depth: int,
+    *,
+    locked: bool = True,
 ) -> int:
     """A `crawl.fetch` of `webpage` at `depth`, locked by its domain, so the host's fetches run
-    one at a time, in the order they were queued, however many workers there are."""
+    one at a time, in the order they were queued, however many workers there are. A fetch the
+    fence will refuse sends no request, so it is queued with `locked` False and does not wait
+    behind the host's: a CDN's resized images would otherwise hold back its PDFs."""
     return await queue(
         session,
         FETCH_TASK,
-        lock=str(domain),
+        lock=str(domain) if locked else None,
         run_id=str(run_id),
         webpage_id=str(webpage),
         depth=depth,
@@ -646,15 +654,20 @@ async def queue_links(
         return 0
     await lock_run(session, run_id)
     domains = {
-        host: (await ensure_domain(session, host, CrawlPolicy.FILES_ONLY)).id
+        host: await ensure_domain(session, host, CrawlPolicy.FILES_ONLY)
         for host in {host_of(url) for url in urls}
     }
+    website_url = await session.scalar(
+        select(Institution.website_url)
+        .join(CrawlRun, CrawlRun.institution_id == Institution.id)
+        .where(CrawlRun.id == run_id)
+    )
     await session.execute(
         insert(Webpage).on_conflict_do_nothing(),
         [
             {
                 "url": url,
-                "domain_id": domains[host_of(url)],
+                "domain_id": domains[host_of(url)].id,
                 "discovered_from_webpage_id": found_on.id if found_on else None,
             }
             for url in urls
@@ -678,7 +691,11 @@ async def queue_links(
         if ids[url] in in_run:
             continue
         in_run.add(ids[url])
-        await queue_fetch(session, run_id, ids[url], domains[host_of(url)], depth)
+        domain = domains[host_of(url)]
+        refused = type_refusal(url) or (
+            website_url is not None and refusal(url, domain.crawl_policy, website_url, depth)
+        )
+        await queue_fetch(session, run_id, ids[url], domain.id, depth, locked=not refused)
         queued += 1
     return queued
 

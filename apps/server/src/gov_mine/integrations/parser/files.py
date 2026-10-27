@@ -3,6 +3,7 @@ a Word file as one. csv and plain text are read as they are."""
 
 import io
 import re
+import threading
 
 import pypdfium2
 from markitdown import MarkItDown, StreamInfo
@@ -30,6 +31,9 @@ _SHEET = re.compile(r"^(?=## )", re.MULTILINE)
 
 # Plugins (the OCR one) stay off: scans are read in 034.
 _markitdown = MarkItDown(enable_plugins=False)
+# PDFium is not thread-safe, and parses run in worker threads: two at once fail with "Data
+# format error" on sound files. Only the split into pages holds it; converting them does not.
+_pdfium = threading.Lock()
 
 
 def _convert(data: bytes, media_type: str, extension: str) -> str:
@@ -39,6 +43,11 @@ def _convert(data: bytes, media_type: str, extension: str) -> str:
 
 def _pdf_pages(data: bytes) -> list[bytes]:
     """Each page of the PDF as a PDF of its own."""
+    with _pdfium:
+        return _split(data)
+
+
+def _split(data: bytes) -> list[bytes]:
     document = pypdfium2.PdfDocument(data)
     try:
         pages = []
