@@ -21,7 +21,6 @@ Make the ticket's behavior work, correctly and completely, and nothing beyond it
 
 - Find the code the change touches, its callers, and existing helpers, types, and patterns that already do part of the job. Extend those; a second version of something that exists is a defect.
 - Check library APIs against the installed version (`node_modules/<pkg>`, `.venv/lib/python3.14/site-packages/<pkg>`), not memory. Dependencies here are often newer than your training data.
-- On `main`, branch first: `git switch -c ticket-<number>-<slug>`.
 
 ## 3. Build
 
@@ -45,7 +44,7 @@ Make the ticket's behavior work, correctly and completely, and nothing beyond it
 
 ## 5. Commit and report
 
-Commit on the branch as `<ticket ref>: <what changed>`, with this report as the commit body (the later sessions read it with `git log`), and give the same report to the user:
+Commit on `main` as `<ticket ref>: <what changed>`, with this report as the commit body (the later sessions read it with `git log`), and give the same report to the user:
 
 - **Criteria**: each one, done or not, and how you verified it (the command and what it showed).
 - **Not verified**: anything you believe works but didn't observe. "Should work" belongs here.
