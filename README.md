@@ -1,9 +1,33 @@
-# gov-mine
+<p align="center">
+  <img src="apps/web/src/app/icon.svg" alt="GovMine logo" width="120" />
+</p>
 
-Crawls a public institution's website from its homepage, keeps a copy of every
-page and file, extracts typed records with a verified citation for every
-field, and re-runs on a schedule. The first institution is CreateTO. The
-design is in [docs/specification/](docs/specification/README.md).
+<h1 align="center">GovMine</h1>
+
+<p align="center">
+  <strong>Public institution websites in, cited and versioned records out.</strong><br />
+  Crawls a public body's website from its homepage, keeps a copy of every page and linked
+  file, and extracts typed records (projects, meetings, contacts, news, RFPs) with a verified
+  citation for every field and a history of every change.
+</p>
+
+<p align="center">
+  <a href="RESULTS.md">Results</a> ·
+  <a href="#running-it">Run it</a> ·
+  <a href="examples/run-1/">Example output</a> ·
+  <a href="docs/specification/README.md">Design</a>
+</p>
+
+| Overview                                      | A run: what was fetched, skipped and paid for     |
+| --------------------------------------------- | ------------------------------------------------- |
+| ![Overview](docs/screenshots/overview.png)    | ![Run page](docs/screenshots/run.png)             |
+| **Projects, one page per record type**        | **A record: every field cited, with its history** |
+| ![Projects](docs/screenshots/projects.png)    | ![Record](docs/screenshots/record.png)            |
+| **Runs: the first crawl and the free repeat** | **Documents and their versions**                  |
+| ![Runs](docs/screenshots/runs.png)            | ![Documents](docs/screenshots/documents.png)      |
+
+The first institution is CreateTO. The design is in
+[docs/specification/](docs/specification/README.md).
 
 | Concern    | TypeScript                                    | Python                          |
 | ---------- | --------------------------------------------- | ------------------------------- |

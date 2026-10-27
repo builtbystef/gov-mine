@@ -16,7 +16,7 @@ services, and a re-run only pays for what changed.
 ## How these results were produced
 
 ```sh
-vp run dev                                    # API, worker (GOV_MINE_JOBS_CONCURRENCY=8), dashboard
+vp run dev                                    # API, worker (GOV_MINE_JOBS_CONCURRENCY=20), dashboard
 cd apps/server
 uv run gov-mine seed                          # CreateTO's institution id
 uv run gov-mine run create <id> --full        # run 1, then again for run 2
@@ -27,17 +27,28 @@ uv run gov-mine export --out ../../examples/run-1
 Machine: AMD Ryzen 5 3600 (6 cores, 12 threads), 15 GB RAM, home broadband. Date:
 2026-10-27. Model access: OpenRouter. The database and bucket were emptied before run 1.
 
-Two bugs surfaced during run 1 and were fixed while it ran (commit `2646198`, with a test):
+These are the second set of runs that day. A first set (11:17 to 11:56, same site) found four
+bugs, each fixed with a test before these runs started:
 
-- **A CDN's images held back its PDFs.** Every CreateTO page links a dozen resized copies of
-  each image on `a-us.storyblok.com`, the same host as its PDFs. Each was queued behind the
-  host's lock only to be refused without a request, so the queue drained at 2 jobs a second.
-  Fetches the fence will refuse are now queued without the lock: 70 a second.
-- **PDFium is not thread-safe.** Parses run in worker threads; 57 sound PDFs failed with
-  "Data format error" when parsed in parallel. Splitting a PDF into pages now holds a lock.
-  The 57 were parsed again within run 1, and all succeeded.
+- **A CDN's images held back its PDFs** (`2646198`). Every CreateTO page links a dozen
+  resized copies of each image on `a-us.storyblok.com`, the host of its PDFs. Each waited
+  behind the host's lock only to be refused without a request: 2 jobs a second. Fetches the
+  fence will refuse are now queued without the lock: 70 a second.
+- **PDFium is not thread-safe** (`2646198`). Parses run in worker threads; 57 sound PDFs
+  failed with "Data format error" when parsed in parallel. Splitting a PDF into pages now
+  holds a lock.
+- **Redirects were not followed** (`b8d8dba`). 9 createto.ca URLs redirect, among them
+  Dunn House (`/projects/dunn-house-phase-2`, now `/springhouse`), which the first run 1
+  never reached. A redirect's target is now queued like a link.
+- **An item a document lists twice was counted as an amendment** (`5141ce0`). Two board
+  agendas name their meeting twice; the first run 1 reported 2 amendments on a first crawl.
 
-From 11:37 a second worker (12 job slots) shared the queue, to get through the model calls.
+The first set's numbers, for comparison: run 1 took 24 min 23 s with fixes applied mid-run,
+722 requests, 709 snapshots, 710 records, 1,323 calls, $0.47; run 2 took 7 min 43 s, 0
+snapshots, $0.
+
+From 12:31 a second worker process (10 job slots) shared the queue: parsing PDFs is CPU-bound
+Python, and in one process its threads starved the job loop of the GIL.
 
 ## Two runs of the live site
 
@@ -46,22 +57,19 @@ a site that hasn't changed.
 
 |                                     |           Run 1 (first) | Run 2 (unchanged repeat) |
 | ----------------------------------- | ----------------------: | -----------------------: |
-| Run id                              |         `01a17def-b8eb` |          `01a17e06-2748` |
-| Time taken                          |             24 min 23 s |               7 min 43 s |
-| Requests sent                       |                     722 |                      722 |
-| Snapshots written (new bytes)       |            709 (1.1 GB) |                        0 |
-| Files processed                     | 709 (466 PDF, 243 HTML) |        0 (709 unchanged) |
-| Files failed                        |                       0 |                        0 |
-| Documents new / changed             |                 676 / 0 |                    0 / 0 |
-| Records created / amended           |                 710 / 2 |                    0 / 0 |
-| Paid calls                          |                   1,323 |                        0 |
-| Cost, reported by OpenRouter        |                   $0.47 |                       $0 |
-| Cost, estimated from the price list |                   $0.44 |                       $0 |
+| Run id                              |         `01a17e27-f477` |          `01a17e3a-1526` |
+| Time taken                          |             19 min 40 s |                   R2TIME |
+| Requests sent                       |                     729 |                    R2REQ |
+| Snapshots written (new bytes)       |           716 (1.15 GB) |                   R2SNAP |
+| Files processed                     | 716 (472 PDF, 244 HTML) |                  R2FILES |
+| Files failed                        |                       0 |                   R2FAIL |
+| Documents new / changed             |                 682 / 0 |                   R2DOCS |
+| Records created / amended           |                 721 / 0 |                    R2REC |
+| Paid calls                          |                   1,335 |                  R2CALLS |
+| Cost, reported by OpenRouter        |                   $0.49 |                   R2COST |
+| Cost, estimated from the price list |                   $0.45 |                    R2EST |
 
-Run 2 sent the same 722 requests and got the same bytes back for all 709 pages and files, so
-it wrote nothing and called no model. It took a third of run 1's time: the requests, at one a
-second per host, are what is left. Conditional requests (ETag, postponed) would make most of
-them 304s.
+R2TEXT
 
 Why run 2 costs nothing: a page whose bytes are unchanged writes no snapshot, so
 it isn't parsed, classified or extracted again. A page whose bytes change but
@@ -72,37 +80,37 @@ whose text doesn't (a new build id, say) is parsed but not re-extracted.
 
 | Number                              | Value                                                           |
 | ----------------------------------- | --------------------------------------------------------------- |
-| Run                                 | 01a17def-b8eb-77e4-a3a3-9c94d718df6c (CreateTO, full, finished) |
-| Time taken                          | 1462.9 s                                                        |
-| Requests sent                       | 722                                                             |
-| Snapshots written                   | 709                                                             |
-| Files processed                     | 709                                                             |
+| Run                                 | 01a17e27-f477-7631-b342-b007879dea66 (CreateTO, full, finished) |
+| Time taken                          | 1180.1 s                                                        |
+| Requests sent                       | 729                                                             |
+| Snapshots written                   | 716                                                             |
+| Files processed                     | 716                                                             |
 | Files failed                        | 0                                                               |
 | Files still parsing                 | 0                                                               |
-| Documents new                       | 676                                                             |
+| Documents new                       | 682                                                             |
 | Documents changed                   | 0                                                               |
 | Documents removed                   | 0                                                               |
-| Records created                     | 710                                                             |
-| Records amended                     | 2                                                               |
-| Paid calls                          | 1323                                                            |
-| Cost, estimated from the price list | $0.439195                                                       |
-| Cost, reported by OpenRouter        | $0.474580                                                       |
+| Records created                     | 721                                                             |
+| Records amended                     | 0                                                               |
+| Paid calls                          | 1335                                                            |
+| Cost, estimated from the price list | $0.448834                                                       |
+| Cost, reported by OpenRouter        | $0.488317                                                       |
 
 | Fetch outcome  | Fetches | Requests sent |
 | -------------- | ------: | ------------: |
 | blocked_robots |       3 |             0 |
 | failed_http    |      13 |            13 |
-| fetched        |     709 |           709 |
-| skipped_scope  |    6597 |             0 |
+| fetched        |     716 |           716 |
+| skipped_scope  |    6630 |             0 |
 
 | Paid calls by purpose | Calls | Input tokens | Output tokens | Estimated (price list) | Reported (OpenRouter) |
 | --------------------- | ----: | -----------: | ------------: | ---------------------: | --------------------: |
-| classify              |   709 |      2787195 |        210600 |              $0.117062 |             $0.117062 |
-| extract               |   614 |      1717125 |        300841 |              $0.322133 |             $0.357517 |
+| classify              |   716 |      2824788 |        212681 |              $0.118641 |             $0.118641 |
+| extract               |   619 |      1739709 |        312444 |              $0.330193 |             $0.369675 |
 
 | Cost by provider | Calls | Estimated (price list) | Reported (OpenRouter) | Calls with no reported cost |
 | ---------------- | ----: | ---------------------: | --------------------: | --------------------------: |
-| openrouter       |  1323 |              $0.439195 |             $0.474580 |                           0 |
+| openrouter       |  1335 |              $0.448834 |             $0.488317 |                           0 |
 
 Removed documents (webpage went missing in this run):
 
@@ -114,12 +122,12 @@ Unextracted documents (extraction failed):
 
 Fallback reasons per source:
 
-- none: no_rule 544
-- 01a17def-d1f1-7146-8d06-2dc191809702: no_rule 1
-- 01a17df0-1bf6-7160-b720-d1b08575b9d5: no_rule 16
-- 01a17df0-2929-71fc-a031-bdd309d81dc2: no_rule 10
-- 01a17df0-35fc-7700-b696-2d5fda3b26f0: no_rule 3
-- 01a17df0-3c47-728f-ba06-ad7f7cca1e18: no_rule 39
+- none: no_rule 551
+- 01a17e28-495a-755a-ac5d-161050de3cf2: no_rule 1
+- 01a17e28-ed2e-700d-8df0-c509e480849a: no_rule 15
+- 01a17e28-ef39-7150-81be-14b25be2caab: no_rule 10
+- 01a17e29-2adc-71e4-b09b-bbd6ed6386ab: no_rule 3
+- 01a17e29-91ee-7625-980a-903972680d02: no_rule 39
 
 </details>
 
@@ -178,7 +186,7 @@ The run page's Fetches tab filters by outcome.
 
 | Outcome                          |  Run 1 | Typical reasons                                                                 |
 | -------------------------------- | -----: | ------------------------------------------------------------------------------- |
-| `skipped_scope`                  |  6,597 | `not_a_file` (a page on a files-only host), `outside_prefix`, `private_address` |
+| `skipped_scope`                  |  6,630 | `not_a_file` (a page on a files-only host), `outside_prefix`, `private_address` |
 | `skipped_type`                   |      0 | `extension png`, `content_type application/json`                                |
 | `skipped_size`                   |      0 | over 100 MB                                                                     |
 | `skipped_depth`                  |      0 | more than 50 links from a seed                                                  |
@@ -187,13 +195,14 @@ The run page's Fetches tab filters by outcome.
 
 In run 1:
 
-- `skipped_scope`: 6,380 of the 6,597 are resized images on CreateTO's asset CDN
+- `skipped_scope`: 6,407 of the 6,630 are resized images on CreateTO's asset CDN
   (`…/photo.jpg/m/640x474/smart`); the rest are pages on other hosts (toronto.ca, YouTube,
   Outlook safe links), which are `files_only`. All are refused without a request.
 - `blocked_robots`: two brochures on `f.datasrvr.com` and one Dropbox file.
-- `failed_http`: 9 redirects (307/308, see known gaps), 3 not found, 1 forbidden.
-- 6 hosts were fetched from: `a-us.storyblok.com` 438, `createto.ca` 243, `www.toronto.ca`
-  22, `www.waterfrontoronto.ca` 4, `pnlt.ca` 1, `ontarioplanners.ca` 1.
+- `failed_http`: 9 redirects (307/308), each with `redirect <target>` as its reason and
+  the target crawled (`/springhouse` among them); 3 not found; 1 forbidden.
+- 6 hosts were fetched from: `a-us.storyblok.com` 443, `createto.ca` 244, `www.toronto.ca`
+  23, `www.waterfrontoronto.ca` 4, `pnlt.ca` 1, `ontarioplanners.ca` 1.
 
 ## Variants: unchanged, changed source, failed file
 
@@ -241,49 +250,44 @@ within the last five years are kept; undated ones are kept too. Exporting the
 same database twice gives the same lines.
 
 - Run 1's export: [examples/run-1/](examples/run-1/)
-- Records per type, dated 2021-10-27 or later (480 of the 710 created): 155 projects,
-  195 meetings, 95 contacts, 34 news items, 1 RFP; 0 contracts and 0 grants. 1,501
-  citations, every one with a page number; 1,438 (95.8%) verified against the page text.
+- Records per type, dated 2021-10-27 or later (496 of the 721 created): 161 projects,
+  195 meetings, 103 contacts, 35 news items, 1 RFP; 0 contracts and 0 grants. 1,569
+  citations, every one with a page number; 1,488 (94.8%) verified against the page text.
 
-A project record and two of its citations (abridged: it has 7 citations, one per field):
+A project record and two of its citations (abridged: it has 6 citations, one per field):
 
 ```json
 {
-  "id": "01a17e04-3f1a-7517-bcc2-76a79b1374d7",
+  "id": "01a17e36-11fd-723e-873c-6982928eb982",
   "institution": "CreateTO",
   "document": "https://a-us.storyblok.com/f/1017201/x/505dcf904a/resource-2021-report-completion-of-phase-2-feasibility-study-advancing-to-phase-3.pdf",
   "key": "",
   "name": "Parkdale Hub Project",
-  "phase": "Phase 2 feasibility study completed; advancing to Phase 3",
+  "phase": "Phase 2 Feasibility Study completed; advancing to Phase 3",
   "end_date": null,
-  "location": "Parkdale, at 1303 and 1313 Queen Street West and 220 Cowan Avenue",
-  "partners": [
-    "Parks, Forestry & Recreation",
-    "Toronto Public Library",
-    "Housing Secretariat",
-    "…"
-  ],
+  "location": "Parkdale, on the south side of the intersection of Queen Street West and Cowan Avenue",
+  "partners": ["CreateTO", "Corporate Real Estate Management", "Parks, Forestry & Recreation", "…"],
   "materials": null,
   "start_date": "2017-01-01",
-  "description": "A transformational city-building initiative intended to deliver wide-ranging benefits to the Parkdale community.",
+  "description": "A city-building initiative to create non-profit affordable rental housing, revitalize and expand the Masaryk-Cowan Community Recreation Centre, reconstruct and expand the Parkdale Library, continue Artscape’s cultural hub program, and create connected community space.",
   "citations": [
     {
       "field": "location",
       "url": "https://a-us.storyblok.com/f/1017201/x/505dcf904a/resource-2021-report-completion-of-phase-2-feasibility-study-advancing-to-phase-3.pdf",
       "page": 5,
-      "excerpt": "City-owned properties located at 1303, 1313 Queen St. W. and 220 Cowan Ave., in the heart of the Parkdale community.",
+      "excerpt": "The Parkdale Hub site is comprised of City-owned properties located on the south side of the intersection of Queen Street West and Cowan Avenue",
       "verified": true
     },
     {
-      "field": "name",
+      "field": "phase",
       "url": "https://a-us.storyblok.com/f/1017201/x/505dcf904a/resource-2021-report-completion-of-phase-2-feasibility-study-advancing-to-phase-3.pdf",
       "page": 1,
-      "excerpt": "Parkdale Hub Project – Completion of Phase 2 Feasibility Study, Advancing to Phase 3",
+      "excerpt": "Completion of Phase 2 Feasibility Study, Advancing to Phase 3",
       "verified": true
     }
   ],
-  "first_seen_at": "2026-10-27T15:39:29.947010+00:00",
-  "last_changed_at": "2026-10-27T15:39:30.172848+00:00"
+  "first_seen_at": "2026-10-27T16:33:55.198273+00:00",
+  "last_changed_at": "2026-10-27T16:33:56.709280+00:00"
 }
 ```
 
@@ -296,12 +300,12 @@ version 2026-10-27).
 
 | Model               | Used for                           | Price list (USD per 1M tokens, input / output) | Run 1                                 | Per call (reported) |
 | ------------------- | ---------------------------------- | ---------------------------------------------- | ------------------------------------- | ------------------: |
-| `typesafe/jev-1.14` | Classifying each new page          | 0.042 / free                                   | 709 calls, 2.8M tokens in, $0.117     |            $0.00017 |
-| `openai/gpt-6-luna` | Extracting records from a document | 0.10 / 0.50                                    | 614 calls, 1.7M in / 0.3M out, $0.358 |            $0.00058 |
+| `typesafe/jev-1.14` | Classifying each new page          | 0.042 / free                                   | 716 calls, 2.8M tokens in, $0.119     |            $0.00017 |
+| `openai/gpt-6-luna` | Extracting records from a document | 0.10 / 0.50                                    | 619 calls, 1.7M in / 0.3M out, $0.370 |            $0.00060 |
 
-OpenRouter reported 11% more than the price list for `gpt-6-luna` on run 1 ($0.358 against
-$0.322) and the same for Jev. The reported figure is the one to budget with. A full first
-crawl of CreateTO costs about **$0.47** in model calls: about $0.0007 per document.
+OpenRouter reported 12% more than the price list for `gpt-6-luna` on run 1 ($0.370 against
+$0.330) and the same for Jev. The reported figure is the one to budget with. A full first
+crawl of CreateTO costs about **$0.49** in model calls: about $0.0007 per document.
 
 No other paid service is called: no search API, no OCR service, no proxy.
 
@@ -317,22 +321,22 @@ worker, dashboard, plus Railway's PostgreSQL); snapshots in a Railway bucket. Me
 the processes used here: the worker reached 0.9 to 1.5 GB while parsing large PDFs, the API
 about 50 MB, the dashboard about 160 MB, PostgreSQL about 300 MB.
 
-| Item                     | Basis                                                                           | Estimate per month |
-| ------------------------ | ------------------------------------------------------------------------------- | -----------------: |
-| Model calls, first run   | Run 1's reported cost, once                                                     |        $0.47, once |
-| Model calls, weekly runs | Run 2 cost $0; plus changed documents, say 5% a week at run 1's $0.0007 each    |             ~$0.10 |
-| Worker                   | ~1 GB held between runs (Python keeps what parsing took), ~0.05 vCPU on average |        ~$11 (est.) |
-| API and dashboard        | ~0.25 GB together, near-idle CPU                                                |      ~$2.50 (est.) |
-| PostgreSQL               | ~0.3 GB memory, 1 GB volume                                                     |      ~$3.20 (est.) |
-| Bucket                   | 1.1 GB of snapshots and their text after run 1, growing only with changed files |      ~$0.02 (est.) |
-| **Total**                | About $17 of usage: on the Pro plan, its $20 minimum                            |  **$15–25 (est.)** |
+| Item                     | Basis                                                                            | Estimate per month |
+| ------------------------ | -------------------------------------------------------------------------------- | -----------------: |
+| Model calls, first run   | Run 1's reported cost, once                                                      |        $0.49, once |
+| Model calls, weekly runs | Run 2 cost $0; plus changed documents, say 5% a week at run 1's $0.0007 each     |             ~$0.10 |
+| Worker                   | ~1 GB held between runs (Python keeps what parsing took), ~0.05 vCPU on average  |        ~$11 (est.) |
+| API and dashboard        | ~0.25 GB together, near-idle CPU                                                 |      ~$2.50 (est.) |
+| PostgreSQL               | ~0.3 GB memory, 1 GB volume                                                      |      ~$3.20 (est.) |
+| Bucket                   | 1.15 GB of snapshots and their text after run 1, growing only with changed files |      ~$0.02 (est.) |
+| **Total**                | About $17 of usage: on the Pro plan, its $20 minimum                             |  **$15–25 (est.)** |
 
 Hosting dominates: model calls are cents a month once the first crawl is paid for. The same
 app serves more institutions for little more than their first crawl, until one worker is no
 longer enough.
 
 Snapshot storage after run 1: `SELECT pg_size_pretty(sum(size_bytes)) FROM webpage_snapshots;`
-gives 1104 MB (709 snapshots: 466 PDFs, 243 HTML pages).
+gives 1152 MB (716 snapshots: 472 PDFs, 244 HTML pages).
 
 ## Decisions and trade-offs
 

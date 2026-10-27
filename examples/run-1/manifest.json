@@ -1,11 +1,11 @@
 {
-  "exported_at": "2026-10-27T15:42:05.218237+00:00",
+  "exported_at": "2026-10-27T16:38:58.815981+00:00",
   "cutoff": "2021-10-27",
   "runs": [
     {
       "institution": "CreateTO",
-      "run": "01a17def-b8eb-77e4-a3a3-9c94d718df6c",
-      "finished_at": "2026-10-27T15:41:27.834738+00:00"
+      "run": "01a17e27-f477-7631-b342-b007879dea66",
+      "finished_at": "2026-10-27T16:38:10.304669+00:00"
     }
   ],
   "extractors": [
@@ -16,14 +16,14 @@
     "model:rfp@1"
   ],
   "files": {
-    "citations.jsonl": 1501,
-    "contacts.jsonl": 95,
+    "citations.jsonl": 1569,
+    "contacts.jsonl": 103,
     "contracts.jsonl": 0,
-    "documents.jsonl": 448,
+    "documents.jsonl": 459,
     "grants.jsonl": 0,
     "meetings.jsonl": 195,
-    "news_items.jsonl": 34,
-    "projects.jsonl": 155,
+    "news_items.jsonl": 35,
+    "projects.jsonl": 161,
     "rfps.jsonl": 1
   }
 }
