@@ -9,11 +9,11 @@ A refactor with no change in what the worker does: a `gov-mine` command-line pro
 
 ## Acceptance criteria
 
-- [ ] `gov-mine --help` lists a `worker` command, and `gov-mine worker --help` documents `--concurrency`.
-- [ ] `gov-mine worker` starts a worker that registers the same tasks as before (including `jobs.retry_stalled`) and runs queued jobs.
-- [ ] `gov-mine worker --concurrency 3` runs at most three jobs at once; without the flag the configured default is used.
-- [ ] The `gov-mine-worker` script no longer exists, and `vp run dev` starts the worker through `gov-mine worker`.
-- [ ] An unknown command or option exits with a non-zero code.
+- [x] `gov-mine --help` lists a `worker` command, and `gov-mine worker --help` documents `--concurrency`.
+- [x] `gov-mine worker` starts a worker that registers the same tasks as before (including `jobs.retry_stalled`) and runs queued jobs.
+- [x] `gov-mine worker --concurrency 3` runs at most three jobs at once; without the flag the configured default is used.
+- [x] The `gov-mine-worker` script no longer exists, and `vp run dev` starts the worker through `gov-mine worker`.
+- [x] An unknown command or option exits with a non-zero code.
 
 ## Out of scope
 
