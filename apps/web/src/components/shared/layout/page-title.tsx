@@ -12,25 +12,24 @@ export function PageTitle() {
   return title ? <h1 className="truncate text-sm font-medium">{title}</h1> : null;
 }
 
+/** Sections whose pages are a list and an item: the list's title, then an item's. */
+const listSections: Record<string, [string, string]> = {
+  runs: ["Runs", "Run"],
+  records: ["Records", "Record"],
+  documents: ["Documents", "Document"],
+  snapshots: ["Snapshots", "Snapshot"],
+  webpages: ["Webpages", "Webpage"],
+};
+
 export function titleFor(pathname: string): string | null {
   const [section, id, action] = pathname.split("/").filter(Boolean);
-  switch (section) {
-    case undefined:
-      return "Home";
-    case "institutions":
-      if (id === undefined) return "Institutions";
-      return id === "new"
-        ? "Add institution"
-        : action === "edit"
-          ? "Edit institution"
-          : "Institution";
-    case "runs":
-      return id === undefined ? "Runs" : "Run";
-    case "snapshots":
-      return "Snapshot";
-    case "webpages":
-      return "Webpage";
-    default:
-      return null;
+  if (section === undefined) return "Home";
+  if (section === "institutions") {
+    if (id === undefined) return "Institutions";
+    if (id === "new") return "Add institution";
+    return action === "edit" ? "Edit institution" : "Institution";
   }
+  const titles = listSections[section];
+  if (titles === undefined) return null;
+  return id === undefined ? titles[0] : titles[1];
 }

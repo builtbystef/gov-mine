@@ -1040,6 +1040,166 @@
         }
       }
     },
+    "/record-types": {
+      "get": {
+        "tags": [
+          "records"
+        ],
+        "summary": "List Record Types",
+        "description": "Every record type with its fields.",
+        "operationId": "records-list_record_types",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RecordTypeOutput"
+                  },
+                  "type": "array",
+                  "title": "Response Records-List Record Types"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/records": {
+      "get": {
+        "tags": [
+          "records"
+        ],
+        "summary": "List Records",
+        "description": "Current records, most recently extracted first, by type or by document.",
+        "operationId": "records-list_records",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/RecordType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "name": "document",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Document"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_RecordSummary_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/records/{record_id}": {
+      "get": {
+        "tags": [
+          "records"
+        ],
+        "summary": "Read Record",
+        "description": "The record's current fields with their citations, and its record snapshots, newest\nfirst, each as the fields that changed.",
+        "operationId": "records-read_record",
+        "parameters": [
+          {
+            "name": "record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Record Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "summary": "Read Root",
@@ -1180,6 +1340,41 @@
           "transcribe"
         ],
         "title": "AIPurpose"
+      },
+      "CitationOutput": {
+        "properties": {
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Snapshot Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "excerpt": {
+            "type": "string",
+            "title": "Excerpt"
+          },
+          "verified": {
+            "type": "boolean",
+            "title": "Verified"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshot_id",
+          "url",
+          "page",
+          "excerpt",
+          "verified"
+        ],
+        "title": "CitationOutput",
+        "description": "Where a value was read: a page (from 1) of a snapshot of `url`, and the excerpt. `verified`\nis the quote check's verdict."
       },
       "DocumentOutput": {
         "properties": {
@@ -1383,6 +1578,55 @@
         ],
         "title": "FetchOutput",
         "description": "One attempt at a URL. `snapshot` is the copy it wrote, if it wrote one."
+      },
+      "FieldChange": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "before": {
+            "title": "Before"
+          },
+          "after": {
+            "title": "After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "before",
+          "after"
+        ],
+        "title": "FieldChange"
+      },
+      "FieldOutput": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "citation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CitationOutput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "value",
+          "citation"
+        ],
+        "title": "FieldOutput"
       },
       "HTTPValidationError": {
         "properties": {
@@ -1761,6 +2005,37 @@
         ],
         "title": "Page[InstitutionOutput]"
       },
+      "Page_RecordSummary_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RecordSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[RecordSummary]"
+      },
       "Page_RunOutput_": {
         "properties": {
           "items": {
@@ -1957,6 +2232,235 @@
           "amended"
         ],
         "title": "RecordCounts"
+      },
+      "RecordDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "record_type": {
+            "$ref": "#/components/schemas/RecordType"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "extracted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Extracted At"
+          },
+          "institution_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Institution Id"
+          },
+          "institution_name": {
+            "type": "string",
+            "title": "Institution Name"
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "document_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Title"
+          },
+          "document_type": {
+            "$ref": "#/components/schemas/DocumentType"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/FieldOutput"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/RecordSnapshotOutput"
+            },
+            "type": "array",
+            "title": "History"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "record_type",
+          "key",
+          "extracted_at",
+          "institution_id",
+          "institution_name",
+          "document_id",
+          "document_title",
+          "document_type",
+          "url",
+          "fields",
+          "history"
+        ],
+        "title": "RecordDetail",
+        "description": "A record's current fields, each with its citation, and its history, newest first."
+      },
+      "RecordSnapshotOutput": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "extracted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Extracted At"
+          },
+          "extraction_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Extraction Id"
+          },
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Snapshot Id"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/FieldChange"
+            },
+            "type": "array",
+            "title": "Changes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "extracted_at",
+          "extraction_id",
+          "snapshot_id",
+          "changes"
+        ],
+        "title": "RecordSnapshotOutput",
+        "description": "One state of the record, as the fields that changed from the state before it."
+      },
+      "RecordSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "record_type": {
+            "$ref": "#/components/schemas/RecordType"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data"
+          },
+          "extracted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Extracted At"
+          },
+          "institution_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Institution Id"
+          },
+          "institution_name": {
+            "type": "string",
+            "title": "Institution Name"
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "document_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Title"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "record_type",
+          "key",
+          "data",
+          "extracted_at",
+          "institution_id",
+          "institution_name",
+          "document_id",
+          "document_title",
+          "url"
+        ],
+        "title": "RecordSummary",
+        "description": "A record's current state, with the document it was extracted from."
+      },
+      "RecordType": {
+        "type": "string",
+        "enum": [
+          "project",
+          "news_item",
+          "meeting",
+          "contact",
+          "rfp",
+          "grant",
+          "contract"
+        ],
+        "title": "RecordType"
+      },
+      "RecordTypeOutput": {
+        "properties": {
+          "record_type": {
+            "$ref": "#/components/schemas/RecordType"
+          },
+          "fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "record_type",
+          "fields"
+        ],
+        "title": "RecordTypeOutput",
+        "description": "A record type and its fields, in the order the dashboard shows them."
       },
       "RemovedDocument": {
         "properties": {

@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ValidationError
 from pydantic_ai import Agent, NativeOutput, capture_run_messages
 from pydantic_ai.exceptions import ModelAPIError, UnexpectedModelBehavior
-from sqlalchemy import select
+from sqlalchemy import Select, func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from gov_mine.db.base import utcnow
@@ -40,8 +40,17 @@ from gov_mine.modules.extract.records import (
     draft_data,
     output_type,
 )
+from gov_mine.modules.extract.schemas import (
+    CitationOutput,
+    FieldChange,
+    FieldOutput,
+    RecordDetail,
+    RecordSnapshotOutput,
+    RecordSummary,
+)
 from gov_mine.modules.ingest import service as ingest
 from gov_mine.modules.ingest.models import TextStatus, WebpageSnapshot
+from gov_mine.modules.institutions.models import Institution
 from gov_mine.modules.ledger import service as ledger
 from gov_mine.modules.ledger.models import AIPurpose
 from gov_mine.shared.exceptions import NotFoundError
@@ -410,6 +419,141 @@ async def list_current_records(
     return list((await session.execute(query)).all())
 
 
+def record_fields() -> dict[str, list[str]]:
+    """Each record type's fields, in its model's order."""
+    return {name: list(model.model_fields) for name, model in RECORD_TYPES.items()}
+
+
+def _with_document[*Ts](query: Select[*Ts]) -> Select[*Ts]:
+    return (
+        query.join(Document, Document.id == current_records.c.document_id)
+        .join(Webpage, Webpage.id == Document.webpage_id)
+        .join(Institution, Institution.id == current_records.c.institution_id)
+    )
+
+
+async def list_records(
+    session: AsyncSession,
+    *,
+    record_type: RecordType | None,
+    document_id: uuid.UUID | None,
+    limit: int,
+    offset: int,
+) -> tuple[list[RecordSummary], int]:
+    """Current records, most recently extracted first, with their document's title and URL."""
+    where = []
+    if record_type is not None:
+        where.append(current_records.c.record_type == record_type)
+    if document_id is not None:
+        where.append(current_records.c.document_id == document_id)
+    total = await session.scalar(select(func.count()).select_from(current_records).where(*where))
+    rows = await session.execute(
+        _with_document(select(current_records, Document.title, Webpage.url, Institution.name))
+        .where(*where)
+        .order_by(current_records.c.extracted_at.desc(), current_records.c.record_id)
+        .limit(limit)
+        .offset(offset)
+    )
+    items = [
+        RecordSummary(
+            id=row.record_id,
+            record_type=row.record_type,
+            key=row.key,
+            data=row.data,
+            extracted_at=row.extracted_at,
+            institution_id=row.institution_id,
+            institution_name=row.name,
+            document_id=row.document_id,
+            document_title=row.title,
+            url=row.url,
+        )
+        for row in rows
+    ]
+    return items, total or 0
+
+
+async def read_record(session: AsyncSession, record_id: uuid.UUID) -> RecordDetail:
+    """The record's current fields, each with its citation (the URL, page, excerpt and quote
+    check of the snapshot it was read from), and every record snapshot, newest first, as the
+    fields that changed from the one before."""
+    row = (
+        await session.execute(
+            _with_document(
+                select(
+                    current_records,
+                    Document.title,
+                    Document.document_type,
+                    Webpage.url,
+                    Institution.name,
+                )
+            ).where(current_records.c.record_id == record_id)
+        )
+    ).one_or_none()
+    if row is None:
+        raise NotFoundError(f"Record {record_id} not found")
+    citations = await session.execute(
+        select(Citation, Extraction.snapshot_id, Webpage.url)
+        .join(RecordSnapshot, RecordSnapshot.id == Citation.record_snapshot_id)
+        .join(Extraction, Extraction.id == RecordSnapshot.extraction_id)
+        .join(WebpageSnapshot, WebpageSnapshot.id == Extraction.snapshot_id)
+        .join(Webpage, Webpage.id == WebpageSnapshot.webpage_id)
+        .where(Citation.record_snapshot_id == row.record_snapshot_id)
+    )
+    cited = {
+        citation.field: CitationOutput(
+            snapshot_id=snapshot_id,
+            url=url,
+            page=citation.page,
+            excerpt=citation.excerpt,
+            verified=citation.verified,
+        )
+        for citation, snapshot_id, url in citations
+    }
+    names = record_fields()[row.record_type]
+    fields = [
+        FieldOutput(field=name, value=row.data.get(name), citation=cited.get(name))
+        for name in names
+    ]
+    snapshots = await session.execute(
+        select(RecordSnapshot, Extraction.snapshot_id)
+        .join(Extraction, Extraction.id == RecordSnapshot.extraction_id)
+        .where(RecordSnapshot.record_id == record_id)
+        .order_by(RecordSnapshot.created_at, RecordSnapshot.id)
+    )
+    history: list[RecordSnapshotOutput] = []
+    before: dict[str, Any] = {}
+    for snapshot, snapshot_id in snapshots:
+        changes = [
+            FieldChange(field=name, before=before.get(name), after=snapshot.data.get(name))
+            for name in names
+            if before.get(name) != snapshot.data.get(name)
+        ]
+        history.append(
+            RecordSnapshotOutput(
+                id=snapshot.id,
+                extracted_at=snapshot.created_at,
+                extraction_id=snapshot.extraction_id,
+                snapshot_id=snapshot_id,
+                changes=changes,
+            )
+        )
+        before = snapshot.data
+    return RecordDetail(
+        id=row.record_id,
+        record_type=row.record_type,
+        key=row.key,
+        extracted_at=row.extracted_at,
+        institution_id=row.institution_id,
+        institution_name=row.name,
+        document_id=row.document_id,
+        document_title=row.title,
+        document_type=row.document_type,
+        url=row.url,
+        fields=fields,
+        history=history[::-1],
+    )
+
+
 __all__ = [
     "EXTRACT_TASK",
     "MAX_TEXT_CHARS",
@@ -420,6 +564,9 @@ __all__ = [
     "extractor_versions",
     "latest_date",
     "list_current_records",
+    "list_records",
     "queue_document",
+    "read_record",
+    "record_fields",
     "window_cutoff",
 ]

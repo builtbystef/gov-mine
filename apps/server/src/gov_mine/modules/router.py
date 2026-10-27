@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from gov_mine.modules.classify.router import router as classify_router
+from gov_mine.modules.extract.router import router as extract_router
 from gov_mine.modules.health.router import router as health_router
 from gov_mine.modules.ingest.router import router as ingest_router
 from gov_mine.modules.institutions.router import router as institutions_router
@@ -17,3 +18,4 @@ router.include_router(classify_router)
 router.include_router(ledger_router)
 router.include_router(snapshots_router)
 router.include_router(webpages_router)
+router.include_router(extract_router)

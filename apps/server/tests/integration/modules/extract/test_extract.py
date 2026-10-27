@@ -18,6 +18,7 @@ from gov_mine.modules.ledger.models import AICall, AIPurpose
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
+    from fastapi.testclient import TestClient
     from tests.integration.conftest import Database, InlineConnector, OpenRouter
 
     from gov_mine.config import Settings
@@ -308,3 +309,38 @@ def test_a_failing_model_is_retried_once_then_recorded(
     assert "502" in extraction.error
     assert db.run(_rows, db, Record) == []
     assert db.run(_rows, db, AICall) == []
+
+
+def test_records_are_served_with_their_citations_and_history(
+    client: TestClient, db: Database, object_store: MemoryObjectStore, openrouter: OpenRouter
+):
+    run_id = db.run(_document, db, RELEASE, DocumentType.PRESS_RELEASES)
+    db.run(_store, db, object_store, run_id, RELEASE, RELEASE_PAGE)
+    changed = _cited("The board approved 1,000 homes.", "plan for 1,000 homes")
+    openrouter.answers[RELEASE] = {**NEWS_ANSWER, "records": [{**NEWS_RECORD, "summary": changed}]}
+    db.run(_store, db, object_store, run_id, RELEASE, RELEASE_PAGE + b"<p>Updated.</p>")
+
+    page = client.get("/records", params={"type": "news_item"}).json()
+    assert page["total"] == 1
+    [summary] = page["items"]
+    assert (summary["url"], summary["institution_name"]) == (RELEASE, "CreateTO")
+    assert summary["data"]["summary"] == "The board approved 1,000 homes."
+    assert client.get("/records", params={"type": "project"}).json()["total"] == 0
+
+    record = client.get(f"/records/{summary['id']}").json()
+    fields = {f["field"]: f for f in record["fields"]}
+    assert list(fields) == ["headline", "published_at", "summary"]
+    citation = fields["summary"]["citation"]
+    assert (citation["url"], citation["page"]) == (RELEASE, 1)
+    assert (citation["excerpt"], citation["verified"]) == ("plan for 1,000 homes", True)
+    newest, oldest = record["history"]
+    assert newest["changes"] == [
+        {
+            "field": "summary",
+            "before": "The board approved 2,000 homes.",
+            "after": "The board approved 1,000 homes.",
+        }
+    ]
+    assert newest["snapshot_id"] == citation["snapshot_id"]
+    assert [c["field"] for c in oldest["changes"]] == ["headline", "published_at", "summary"]
+    assert client.get(f"/records/{uuid.uuid4()}").status_code == 404

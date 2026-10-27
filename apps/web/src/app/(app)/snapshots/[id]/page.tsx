@@ -37,6 +37,9 @@ async function SnapshotContent({
 }) {
   const [{ id }, search, timeZone] = await Promise.all([params, searchParams, getTimeZone()]);
   const page = parseTextPage(search);
+  // A record's citation links here with the excerpt to mark on the page.
+  const highlight =
+    typeof search.highlight === "string" && search.highlight ? search.highlight : undefined;
   const result = await api.GET("/snapshots/{snapshot_id}", {
     params: { path: { snapshot_id: id } },
   });
@@ -56,6 +59,7 @@ async function SnapshotContent({
       page={page}
       text={text?.response.ok ? (text.data as string) : null}
       timeZone={timeZone}
+      highlight={highlight}
     />
   );
 }

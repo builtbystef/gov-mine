@@ -367,6 +367,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/record-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Record Types
+         * @description Every record type with its fields.
+         */
+        get: operations["records-list_record_types"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Records
+         * @description Current records, most recently extracted first, by type or by document.
+         */
+        get: operations["records-list_records"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/records/{record_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Record
+         * @description The record's current fields with their citations, and its record snapshots, newest
+         *     first, each as the fields that changed.
+         */
+        get: operations["records-read_record"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/": {
         parameters: {
             query?: never;
@@ -430,6 +491,26 @@ export interface components {
          * @enum {string}
          */
         AIPurpose: "classify" | "extract" | "ocr" | "transcribe";
+        /**
+         * CitationOutput
+         * @description Where a value was read: a page (from 1) of a snapshot of `url`, and the excerpt. `verified`
+         *     is the quote check's verdict.
+         */
+        CitationOutput: {
+            /**
+             * Snapshot Id
+             * Format: uuid
+             */
+            snapshot_id: string;
+            /** Url */
+            url: string;
+            /** Page */
+            page: number;
+            /** Excerpt */
+            excerpt: string;
+            /** Verified */
+            verified: boolean;
+        };
         /**
          * DocumentOutput
          * @description A document a run's classifications found.
@@ -511,6 +592,23 @@ export interface components {
             /** Reason */
             reason: string | null;
             snapshot: components["schemas"]["SnapshotSummary"] | null;
+        };
+        /** FieldChange */
+        FieldChange: {
+            /** Field */
+            field: string;
+            /** Before */
+            before: unknown;
+            /** After */
+            after: unknown;
+        };
+        /** FieldOutput */
+        FieldOutput: {
+            /** Field */
+            field: string;
+            /** Value */
+            value: unknown;
+            citation: components["schemas"]["CitationOutput"] | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -645,6 +743,17 @@ export interface components {
             /** Offset */
             offset: number;
         };
+        /** Page[RecordSummary] */
+        Page_RecordSummary_: {
+            /** Items */
+            items: components["schemas"]["RecordSummary"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
         /** Page[RunOutput] */
         Page_RunOutput_: {
             /** Items */
@@ -719,6 +828,127 @@ export interface components {
             created: number;
             /** Amended */
             amended: number;
+        };
+        /**
+         * RecordDetail
+         * @description A record's current fields, each with its citation, and its history, newest first.
+         */
+        RecordDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            record_type: components["schemas"]["RecordType"];
+            /** Key */
+            key: string;
+            /**
+             * Extracted At
+             * Format: date-time
+             */
+            extracted_at: string;
+            /**
+             * Institution Id
+             * Format: uuid
+             */
+            institution_id: string;
+            /** Institution Name */
+            institution_name: string;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Document Title */
+            document_title: string | null;
+            document_type: components["schemas"]["DocumentType"];
+            /** Url */
+            url: string;
+            /** Fields */
+            fields: components["schemas"]["FieldOutput"][];
+            /** History */
+            history: components["schemas"]["RecordSnapshotOutput"][];
+        };
+        /**
+         * RecordSnapshotOutput
+         * @description One state of the record, as the fields that changed from the state before it.
+         */
+        RecordSnapshotOutput: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Extracted At
+             * Format: date-time
+             */
+            extracted_at: string;
+            /**
+             * Extraction Id
+             * Format: uuid
+             */
+            extraction_id: string;
+            /**
+             * Snapshot Id
+             * Format: uuid
+             */
+            snapshot_id: string;
+            /** Changes */
+            changes: components["schemas"]["FieldChange"][];
+        };
+        /**
+         * RecordSummary
+         * @description A record's current state, with the document it was extracted from.
+         */
+        RecordSummary: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            record_type: components["schemas"]["RecordType"];
+            /** Key */
+            key: string;
+            /** Data */
+            data: {
+                [key: string]: unknown;
+            };
+            /**
+             * Extracted At
+             * Format: date-time
+             */
+            extracted_at: string;
+            /**
+             * Institution Id
+             * Format: uuid
+             */
+            institution_id: string;
+            /** Institution Name */
+            institution_name: string;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Document Title */
+            document_title: string | null;
+            /** Url */
+            url: string;
+        };
+        /**
+         * RecordType
+         * @enum {string}
+         */
+        RecordType: "project" | "news_item" | "meeting" | "contact" | "rfp" | "grant" | "contract";
+        /**
+         * RecordTypeOutput
+         * @description A record type and its fields, in the order the dashboard shows them.
+         */
+        RecordTypeOutput: {
+            record_type: components["schemas"]["RecordType"];
+            /** Fields */
+            fields: string[];
         };
         /**
          * RemovedDocument
@@ -1018,11 +1248,14 @@ export interface components {
 }
 export type AiCallOutput = components['schemas']['AICallOutput'];
 export type AiPurpose = components['schemas']['AIPurpose'];
+export type CitationOutput = components['schemas']['CitationOutput'];
 export type DocumentOutput = components['schemas']['DocumentOutput'];
 export type DocumentType = components['schemas']['DocumentType'];
 export type DocumentTypeCount = components['schemas']['DocumentTypeCount'];
 export type FetchOutcome = components['schemas']['FetchOutcome'];
 export type FetchOutput = components['schemas']['FetchOutput'];
+export type FieldChange = components['schemas']['FieldChange'];
+export type FieldOutput = components['schemas']['FieldOutput'];
 export type HttpValidationError = components['schemas']['HTTPValidationError'];
 export type Health = components['schemas']['Health'];
 export type InstitutionInput = components['schemas']['InstitutionInput'];
@@ -1034,12 +1267,18 @@ export type PageAiCallOutput = components['schemas']['Page_AICallOutput_'];
 export type PageDocumentOutput = components['schemas']['Page_DocumentOutput_'];
 export type PageFetchOutput = components['schemas']['Page_FetchOutput_'];
 export type PageInstitutionOutput = components['schemas']['Page_InstitutionOutput_'];
+export type PageRecordSummary = components['schemas']['Page_RecordSummary_'];
 export type PageRunOutput = components['schemas']['Page_RunOutput_'];
 export type PageSnapshotOutput = components['schemas']['Page_SnapshotOutput_'];
 export type PageSourceOutput = components['schemas']['Page_SourceOutput_'];
 export type ProviderCost = components['schemas']['ProviderCost'];
 export type PurposeCalls = components['schemas']['PurposeCalls'];
 export type RecordCounts = components['schemas']['RecordCounts'];
+export type RecordDetail = components['schemas']['RecordDetail'];
+export type RecordSnapshotOutput = components['schemas']['RecordSnapshotOutput'];
+export type RecordSummary = components['schemas']['RecordSummary'];
+export type RecordType = components['schemas']['RecordType'];
+export type RecordTypeOutput = components['schemas']['RecordTypeOutput'];
 export type RemovedDocument = components['schemas']['RemovedDocument'];
 export type RunCounts = components['schemas']['RunCounts'];
 export type RunCreate = components['schemas']['RunCreate'];
@@ -1687,6 +1926,91 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WebpageOutput"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    "records-list_record_types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordTypeOutput"][];
+                };
+            };
+        };
+    };
+    "records-list_records": {
+        parameters: {
+            query?: {
+                type?: components["schemas"]["RecordType"] | null;
+                document?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_RecordSummary_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    "records-read_record": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordDetail"];
                 };
             };
             /** @description Validation Error */

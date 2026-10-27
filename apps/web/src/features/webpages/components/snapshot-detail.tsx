@@ -6,6 +6,7 @@ import { Detail } from "@/components/shared/detail-list";
 import { PageHeader } from "@/components/shared/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { formatBytes } from "@/lib/formatting/bytes";
+import { findExcerpt } from "@/features/snapshots/highlight";
 import { formatDateTime } from "@/lib/formatting/dates";
 
 /** A snapshot: what was stored, and one page of the text parsed from it. */
@@ -14,11 +15,14 @@ export function SnapshotDetail({
   page,
   text,
   timeZone,
+  highlight,
 }: {
   snapshot: SnapshotOutput;
   page: number;
   text: string | null;
   timeZone: string;
+  /** A cited excerpt to mark on the page. */
+  highlight: string | undefined;
 }) {
   const pageHref = (to: number) =>
     to > 1 ? `/snapshots/${snapshot.id}?page=${to}` : `/snapshots/${snapshot.id}`;
@@ -94,11 +98,36 @@ export function SnapshotDetail({
                 : "The snapshot has no text."}
           </p>
         ) : (
-          <pre className="max-h-[70vh] overflow-auto rounded-lg border bg-muted/40 p-4 text-sm whitespace-pre-wrap">
-            {text}
-          </pre>
+          <MarkedText text={text} highlight={highlight} />
         )}
       </section>
+    </>
+  );
+}
+
+/** A page of text, with a cited excerpt marked when it is found on it as written. */
+function MarkedText({ text, highlight }: { text: string; highlight: string | undefined }) {
+  const at = highlight ? findExcerpt(text, highlight) : null;
+  return (
+    <>
+      {highlight && !at && (
+        <p className="mb-4 text-sm text-muted-foreground">
+          The excerpt “{highlight}” was not found on this page as written.
+        </p>
+      )}
+      <pre className="max-h-[70vh] overflow-auto rounded-lg border bg-muted/40 p-4 text-sm whitespace-pre-wrap">
+        {at ? (
+          <>
+            {text.slice(0, at[0])}
+            <mark id="excerpt" className="rounded-sm bg-yellow-200 px-0.5 dark:bg-yellow-500/40">
+              {text.slice(at[0], at[1])}
+            </mark>
+            {text.slice(at[1])}
+          </>
+        ) : (
+          text
+        )}
+      </pre>
     </>
   );
 }
