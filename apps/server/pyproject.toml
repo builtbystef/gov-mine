@@ -11,7 +11,7 @@ dependencies = [
   # Sitemaps are XML from the sites crawled: parsed with entity expansion refused.
   "defusedxml>=0.7.1,<0.8",
   # 0.x: minor bumps can break, so pin the minor. Starlette is left to FastAPI.
-  "fastapi[standard-no-fastapi-cloud-cli]>=0.160,<0.161",
+  "fastapi[standard-no-fastapi-cloud-cli]>=0.161.1,<0.162",
   # The crawler's client: HTTP/2 and conditional requests.
   "httpx[http2]>=0.28.1,<0.29",
   "logfire[fastapi,sqlalchemy]>=4.41,<6",
