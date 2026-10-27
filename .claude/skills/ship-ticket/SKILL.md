@@ -28,7 +28,7 @@ Make each ticket's behavior work for real, cover its main path with tests, and c
 - Write tests for the main path of each criterion, plus any error case the ticket names explicitly. Expected values come from the ticket, not from running the code.
 - Follow the layout of neighboring tests: Python in `apps/server/tests/{unit,integration}`, TypeScript next to the source as `*.test.ts`. Use the real database (`vp run db:up`); mock only external network, the model, time, and randomness.
 - Skip mutation checks and exhaustive edge cases. If something risky is left untested, say so under **Not tested**.
-- Run the tests near the change while you work (`uv run pytest <path>`, `vp test <path>`).
+- While you work, run only the tests near the change (`uv run pytest <path>`, `vp test <path>`). The full suite is slow: run it once, in step 4.
 
 ## 4. Verify and commit
 
