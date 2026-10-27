@@ -13,4 +13,6 @@ test("costs show cents, or the first figures of a fraction of a cent", () => {
   expect(formatCost("0")).toBe("$0");
   expect(formatCost("1.234500000000")).toBe("$1.23");
   expect(formatCost("0.000123400000")).toBe("$0.00012");
+  expect(formatCost("0.001006362000")).toBe("$0.001");
+  expect(formatCost("0.000070000000")).toBe("$0.00007");
 });

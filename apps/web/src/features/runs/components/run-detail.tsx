@@ -59,7 +59,7 @@ export function RunDetail({
         <Detail label="Finished">{formatDateTime(run.finished_at, timeZone)}</Detail>
         <Detail label="Error">{run.error}</Detail>
       </dl>
-      <nav className="mb-4 flex gap-1 overflow-x-auto border-b" aria-label="Run">
+      <nav className="mb-4 flex gap-1 overflow-x-auto overflow-y-hidden border-b" aria-label="Run">
         {runTabs.map((name) => {
           const query = toSearchString({ tab: name === "fetches" ? undefined : name });
           return (

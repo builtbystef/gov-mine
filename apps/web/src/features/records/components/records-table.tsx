@@ -29,7 +29,7 @@ function FieldValue({ value }: { value: unknown }) {
   const text = formatValue(value);
   if (!text) return <span className="text-muted-foreground">–</span>;
   return (
-    <span className="line-clamp-2 max-w-72" title={text}>
+    <span className="line-clamp-2 block max-w-72 min-w-24 whitespace-normal" title={text}>
       {text}
     </span>
   );
@@ -43,7 +43,9 @@ export function recordColumns(fields: string[], timeZone: string, showType: bool
       header: first ? fieldLabel(first) : "Record",
       cell: ({ row }) => (
         <Link href={`/records/${row.original.id}`} className="font-medium hover:underline">
-          {formatValue(first ? row.original.data[first] : null) || row.original.key || "Record"}
+          {formatValue(first ? row.original.data[first] : Object.values(row.original.data)[0]) ||
+            row.original.key ||
+            "Record"}
         </Link>
       ),
     }),
@@ -66,7 +68,7 @@ export function recordColumns(fields: string[], timeZone: string, showType: bool
       header: "Document",
       cell: ({ row }) => (
         <a href={row.original.url} target="_blank" rel="noreferrer" className="hover:underline">
-          <span className="line-clamp-2 max-w-64">
+          <span className="line-clamp-2 max-w-64 break-words whitespace-normal">
             {row.original.document_title ?? row.original.url}
           </span>
         </a>

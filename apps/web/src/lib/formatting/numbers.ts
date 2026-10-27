@@ -15,5 +15,5 @@ export function formatCost(cost: string): string {
   const value = Number(cost);
   if (value === 0) return "$0";
   if (value >= 0.01) return `$${value.toFixed(2)}`;
-  return `$${value.toPrecision(2)}`;
+  return `$${value.toLocaleString("en-US", { maximumSignificantDigits: 2 })}`;
 }

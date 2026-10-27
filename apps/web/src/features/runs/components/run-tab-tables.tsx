@@ -43,7 +43,10 @@ function words(value: string): string {
 
 function WebpageLink({ id, url }: { id: string; url: string }) {
   return (
-    <Link href={`/webpages/${id}`} className="break-all hover:underline">
+    <Link
+      href={`/webpages/${id}`}
+      className="block min-w-60 break-all whitespace-normal hover:underline"
+    >
       {url}
     </Link>
   );

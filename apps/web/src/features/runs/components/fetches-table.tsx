@@ -28,7 +28,10 @@ function fetchColumns(timeZone: string) {
     column.accessor("url", {
       header: "URL",
       cell: ({ row }) => (
-        <Link href={`/webpages/${row.original.webpage_id}`} className="break-all hover:underline">
+        <Link
+          href={`/webpages/${row.original.webpage_id}`}
+          className="block min-w-60 break-all whitespace-normal hover:underline"
+        >
           {row.original.url}
         </Link>
       ),
@@ -44,7 +47,7 @@ function fetchColumns(timeZone: string) {
         row.original.reason === null ? (
           ""
         ) : (
-          <span className="text-muted-foreground">{row.original.reason}</span>
+          <span className="text-muted-foreground">{reasonLabel(row.original.reason)}</span>
         ),
     }),
     column.accessor("duration_ms", {
@@ -67,8 +70,14 @@ function fetchColumns(timeZone: string) {
   ]);
 }
 
+/** A refusal reason as the API sends it ("outside_prefix"), in words. */
+function reasonLabel(reason: string): string {
+  const text = reason.replaceAll("_", " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 function SnapshotCell({ snapshot }: { snapshot: FetchOutput["snapshot"] }) {
-  if (snapshot === null) return <span className="text-muted-foreground">None</span>;
+  if (snapshot === null) return <span className="text-muted-foreground">–</span>;
   return (
     <Link href={`/snapshots/${snapshot.id}`} className="group flex flex-col gap-0.5">
       <span className="font-mono text-xs group-hover:underline" title={snapshot.id}>
