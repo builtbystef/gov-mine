@@ -97,23 +97,24 @@
   --chart-4: oklch(0.38 0.07 170);
   --chart-5: oklch(0.3 0.05 175);
   --radius: 0.625rem;
-  --sidebar: oklch(1 0 0);
+  /* Two tones: the sidebar a shade darker than the main area. */
+  --sidebar: oklch(0.948 0.012 165);
   --sidebar-foreground: oklch(0.3 0.02 200);
   --sidebar-primary: oklch(0.47 0.095 165);
   --sidebar-primary-foreground: oklch(0.985 0.01 165);
-  --sidebar-accent: oklch(0.95 0.025 165);
-  --sidebar-accent-foreground: oklch(0.3 0.07 165);
-  --sidebar-border: oklch(0.915 0.008 165);
+  --sidebar-accent: oklch(0.9 0.04 165);
+  --sidebar-accent-foreground: oklch(0.28 0.07 165);
+  --sidebar-border: oklch(0.89 0.012 165);
   --sidebar-ring: oklch(0.62 0.1 165);
 }
 
 .dark {
   /* The same design in the dark: neutrals tinted with the brand hue, a lighter green primary. */
-  --background: oklch(0.16 0.008 180);
+  --background: oklch(0.18 0.009 180);
   --foreground: oklch(0.96 0.005 165);
-  --card: oklch(0.2 0.01 175);
+  --card: oklch(0.215 0.011 175);
   --card-foreground: oklch(0.96 0.005 165);
-  --popover: oklch(0.2 0.01 175);
+  --popover: oklch(0.215 0.011 175);
   --popover-foreground: oklch(0.96 0.005 165);
   --primary: oklch(0.72 0.12 162);
   --primary-foreground: oklch(0.2 0.03 170);
@@ -135,11 +136,11 @@
   --chart-3: oklch(0.6 0.11 165);
   --chart-4: oklch(0.48 0.09 168);
   --chart-5: oklch(0.38 0.06 172);
-  --sidebar: oklch(0.19 0.01 175);
+  --sidebar: oklch(0.14 0.008 180);
   --sidebar-foreground: oklch(0.88 0.01 180);
   --sidebar-primary: oklch(0.72 0.12 162);
   --sidebar-primary-foreground: oklch(0.2 0.03 170);
-  --sidebar-accent: oklch(0.28 0.035 165);
+  --sidebar-accent: oklch(0.25 0.04 165);
   --sidebar-accent-foreground: oklch(0.92 0.06 165);
   --sidebar-border: oklch(0.96 0.02 165 / 11%);
   --sidebar-ring: oklch(0.6 0.1 165);

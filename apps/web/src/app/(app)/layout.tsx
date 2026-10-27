@@ -2,6 +2,7 @@ import { Suspense, type ReactNode } from "react";
 
 import { AppSidebar } from "@/components/shared/layout/app-sidebar";
 import { PageTitle } from "@/components/shared/layout/page-title";
+import { ThemeToggle } from "@/components/shared/layout/theme-toggle";
 import { TimeZoneSync } from "@/components/shared/time-zone-sync";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { getTimeZone } from "@/lib/time-zone/server";
@@ -17,6 +18,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           <Suspense>
             <PageTitle />
           </Suspense>
+          <div className="ml-auto">
+            <ThemeToggle />
+          </div>
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 md:py-8">
           {children}
