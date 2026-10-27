@@ -35,7 +35,7 @@ function FieldValue({ value }: { value: unknown }) {
   );
 }
 
-function recordColumns(fields: string[], timeZone: string, showType: boolean) {
+export function recordColumns(fields: string[], timeZone: string, showType: boolean) {
   const [first, ...rest] = fields;
   return column.columns([
     column.display({

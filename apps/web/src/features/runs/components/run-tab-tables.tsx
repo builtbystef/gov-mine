@@ -3,12 +3,14 @@
 import type {
   AiCallOutput,
   DocumentOutput,
+  RecordSummary,
   SnapshotOutput,
   SourceOutput,
 } from "@gov-mine/api-client";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import Link from "next/link";
 
+import { recordColumns } from "@/features/records/components/records-table";
 import { createDataTableColumnHelper, DataTable } from "@/components/shared/data-table";
 import { Badge } from "@/components/ui/badge";
 import { browserApi } from "@/lib/api/client";
@@ -17,7 +19,13 @@ import { formatDateTime } from "@/lib/formatting/dates";
 import { formatCost } from "@/lib/formatting/numbers";
 import { cn } from "@/lib/utils";
 
-import { runAiCallsQuery, runDocumentsQuery, runSnapshotsQuery, runSourcesQuery } from "../queries";
+import {
+  runAiCallsQuery,
+  runDocumentsQuery,
+  runRecordsQuery,
+  runSnapshotsQuery,
+  runSourcesQuery,
+} from "../queries";
 import { useRunTabPage } from "./run-tab-page";
 
 interface TabProps {
@@ -149,6 +157,23 @@ export function DocumentsTab({ runId, initialPage, timeZone, live }: TabProps) {
       page={page}
       onPageChange={setPage}
       emptyMessage="The run found no documents."
+      className={cn(isStale && "opacity-60 transition-opacity")}
+    />
+  );
+}
+
+/** The records the run created or amended, by type, each linked to its page. */
+export function RecordsTab({ runId, initialPage, timeZone, live }: TabProps) {
+  const { page, setPage, listPage, isStale } = useRunTabPage("records", initialPage);
+  const { data } = useSuspenseQuery(runRecordsQuery(browserApi, runId, listPage, live));
+  return (
+    <DataTable<RecordSummary>
+      columns={recordColumns([], timeZone, true)}
+      data={data.items}
+      total={data.total}
+      page={page}
+      onPageChange={setPage}
+      emptyMessage="The run created or amended no records."
       className={cn(isStale && "opacity-60 transition-opacity")}
     />
   );

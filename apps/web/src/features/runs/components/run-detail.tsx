@@ -15,7 +15,7 @@ import { runTabLabels, runTabs, type RunSearch } from "../schemas";
 import { FetchesTable } from "./fetches-table";
 import { RunCounts } from "./run-counts";
 import { RunReport } from "./run-report";
-import { AiCallsTab, DocumentsTab, SnapshotsTab, SourcesTab } from "./run-tab-tables";
+import { AiCallsTab, DocumentsTab, RecordsTab, SnapshotsTab, SourcesTab } from "./run-tab-tables";
 import { RunStatusBadge } from "./status-badges";
 
 /** A run: what it was asked to do, its numbers, and what it did, a tab per kind. */
@@ -90,6 +90,7 @@ export function RunDetail({
       )}
       {tab === "snapshots" && <SnapshotsTab {...tabProps} />}
       {tab === "documents" && <DocumentsTab {...tabProps} />}
+      {tab === "records" && <RecordsTab {...tabProps} />}
       {tab === "sources" && <SourcesTab {...tabProps} />}
       {tab === "ai-calls" && <AiCallsTab {...tabProps} />}
     </>

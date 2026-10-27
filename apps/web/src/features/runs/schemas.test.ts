@@ -17,6 +17,7 @@ test("a page that is not a number is ignored", () => {
 test("the run page reads its tab, outcome and search from the URL", () => {
   expect(parseRunSearch({})).toEqual({});
   expect(parseRunSearch({ tab: "snapshots", page: "2" })).toEqual({ tab: "snapshots", page: 2 });
+  expect(parseRunSearch({ tab: "records" })).toEqual({ tab: "records" });
   expect(parseRunSearch(new URLSearchParams("outcome=skipped_scope&q=%20pdf%20"))).toEqual({
     outcome: "skipped_scope",
     q: "pdf",
@@ -25,5 +26,5 @@ test("the run page reads its tab, outcome and search from the URL", () => {
 
 test("the run page drops a tab, outcome or search it does not know", () => {
   expect(parseRunSearch({ tab: "fetches" })).toEqual({});
-  expect(parseRunSearch({ tab: "records", outcome: "nonsense", q: "" })).toEqual({});
+  expect(parseRunSearch({ tab: "nonsense", outcome: "nonsense", q: "" })).toEqual({});
 });

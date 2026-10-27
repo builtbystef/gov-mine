@@ -17,13 +17,21 @@ export function parsePageSearch(params: SearchParams | URLSearchParams): PageSea
   return parseSearch(pageSearchSchema, params);
 }
 
-export const runTabs = ["fetches", "snapshots", "documents", "sources", "ai-calls"] as const;
+export const runTabs = [
+  "fetches",
+  "snapshots",
+  "documents",
+  "records",
+  "sources",
+  "ai-calls",
+] as const;
 export type RunTab = (typeof runTabs)[number];
 
 export const runTabLabels = {
   fetches: "Fetches",
   snapshots: "Snapshots",
   documents: "Documents",
+  records: "Records",
   sources: "Sources",
   "ai-calls": "AI calls",
 } as const satisfies Record<RunTab, string>;
@@ -47,7 +55,7 @@ export const fetchOutcomes = [
  * tab's page, and on the Fetches tab the outcome and the URL search.
  */
 const runSearchSchema = z.object({
-  tab: optionalParam(z.enum(["snapshots", "documents", "sources", "ai-calls"])),
+  tab: optionalParam(z.enum(["snapshots", "documents", "records", "sources", "ai-calls"])),
   page: optionalParam(z.coerce.number().int().min(2)),
   outcome: optionalParam(z.enum(fetchOutcomes)),
   q: optionalParam(z.string().trim().min(1).max(2048)),

@@ -396,7 +396,8 @@ export interface paths {
         };
         /**
          * List Records
-         * @description Current records, most recently extracted first, by type or by document.
+         * @description Current records, most recently extracted first, by type, by document, or those a run
+         *     created or amended (then by type first).
          */
         get: operations["records-list_records"];
         put?: never;
@@ -1964,6 +1965,7 @@ export interface operations {
             query?: {
                 type?: components["schemas"]["RecordType"] | null;
                 document?: string | null;
+                run?: string | null;
                 limit?: number;
                 offset?: number;
             };

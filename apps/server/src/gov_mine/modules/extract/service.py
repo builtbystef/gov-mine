@@ -432,25 +432,37 @@ def _with_document[*Ts](query: Select[*Ts]) -> Select[*Ts]:
     )
 
 
-async def list_records(
+async def list_records(  # noqa: PLR0913 - the page and its three filters
     session: AsyncSession,
     *,
     record_type: RecordType | None,
     document_id: uuid.UUID | None,
+    run_id: uuid.UUID | None = None,
     limit: int,
     offset: int,
 ) -> tuple[list[RecordSummary], int]:
-    """Current records, most recently extracted first, with their document's title and URL."""
+    """Current records, most recently extracted first, with their document's title and URL.
+    With a run, the records it created or amended (one of its extractions wrote a record
+    snapshot), by type first."""
     where = []
+    order = [current_records.c.extracted_at.desc(), current_records.c.record_id]
     if record_type is not None:
         where.append(current_records.c.record_type == record_type)
     if document_id is not None:
         where.append(current_records.c.document_id == document_id)
+    if run_id is not None:
+        written = (
+            select(RecordSnapshot.record_id)
+            .join(Extraction, Extraction.id == RecordSnapshot.extraction_id)
+            .where(Extraction.crawl_run_id == run_id)
+        )
+        where.append(current_records.c.record_id.in_(written))
+        order.insert(0, current_records.c.record_type)
     total = await session.scalar(select(func.count()).select_from(current_records).where(*where))
     rows = await session.execute(
         _with_document(select(current_records, Document.title, Webpage.url, Institution.name))
         .where(*where)
-        .order_by(current_records.c.extracted_at.desc(), current_records.c.record_id)
+        .order_by(*order)
         .limit(limit)
         .offset(offset)
     )

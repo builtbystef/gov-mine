@@ -1072,7 +1072,7 @@
           "records"
         ],
         "summary": "List Records",
-        "description": "Current records, most recently extracted first, by type or by document.",
+        "description": "Current records, most recently extracted first, by type, by document, or those a run\ncreated or amended (then by type first).",
         "operationId": "records-list_records",
         "parameters": [
           {
@@ -1106,6 +1106,23 @@
                 }
               ],
               "title": "Document"
+            }
+          },
+          {
+            "name": "run",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run"
             }
           },
           {

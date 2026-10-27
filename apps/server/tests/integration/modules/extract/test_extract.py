@@ -344,3 +344,14 @@ def test_records_are_served_with_their_citations_and_history(
     assert newest["snapshot_id"] == citation["snapshot_id"]
     assert [c["field"] for c in oldest["changes"]] == ["headline", "published_at", "summary"]
     assert client.get(f"/records/{uuid.uuid4()}").status_code == 404
+
+
+def test_records_are_filtered_by_the_run_that_created_or_amended_them(
+    client: TestClient, db: Database, object_store: MemoryObjectStore
+):
+    run_id = db.run(_document, db, RELEASE, DocumentType.PRESS_RELEASES)
+    db.run(_store, db, object_store, run_id, RELEASE, RELEASE_PAGE)
+
+    [record] = client.get("/records", params={"run": str(run_id)}).json()["items"]
+    assert record["url"] == RELEASE
+    assert client.get("/records", params={"run": str(uuid.uuid4())}).json()["total"] == 0

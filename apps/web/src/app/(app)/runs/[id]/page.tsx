@@ -11,6 +11,7 @@ import {
   runDocumentsQuery,
   runFetchesQuery,
   runQuery,
+  runRecordsQuery,
   runReportQuery,
   runSnapshotsQuery,
   runSourcesQuery,
@@ -48,6 +49,8 @@ async function prefetchTab(queryClient: QueryClient, id: string, search: RunSear
       return queryClient.prefetchQuery(runSnapshotsQuery(api, id, page, live));
     case "documents":
       return queryClient.prefetchQuery(runDocumentsQuery(api, id, page, live));
+    case "records":
+      return queryClient.prefetchQuery(runRecordsQuery(api, id, page, live));
     case "sources":
       return queryClient.prefetchQuery(runSourcesQuery(api, id, page, live));
     case "ai-calls":

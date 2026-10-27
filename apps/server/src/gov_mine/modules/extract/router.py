@@ -22,16 +22,23 @@ async def list_record_types() -> list[RecordTypeOutput]:
 
 
 @router.get("/records")
-async def list_records(
+async def list_records(  # noqa: PLR0913, PLR0917 - the page and its three filters
     session: SessionDep,
     record_type: Annotated[RecordType | None, Query(alias="type")] = None,
     document: uuid.UUID | None = None,
+    run: uuid.UUID | None = None,
     limit: Limit = 50,
     offset: Offset = 0,
 ) -> Page[RecordSummary]:
-    """Current records, most recently extracted first, by type or by document."""
+    """Current records, most recently extracted first, by type, by document, or those a run
+    created or amended (then by type first)."""
     items, total = await service.list_records(
-        session, record_type=record_type, document_id=document, limit=limit, offset=offset
+        session,
+        record_type=record_type,
+        document_id=document,
+        run_id=run,
+        limit=limit,
+        offset=offset,
     )
     return Page(items=items, total=total, limit=limit, offset=offset)
 

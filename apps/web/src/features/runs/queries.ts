@@ -18,6 +18,7 @@ export const runKeys = {
     [...runKeys.detail(id), "fetches", filters] as const,
   snapshots: (id: string, page: ListPage) => [...runKeys.detail(id), "snapshots", page] as const,
   documents: (id: string, page: ListPage) => [...runKeys.detail(id), "documents", page] as const,
+  records: (id: string, page: ListPage) => [...runKeys.detail(id), "records", page] as const,
   sources: (id: string, page: ListPage) => [...runKeys.detail(id), "sources", page] as const,
   aiCalls: (id: string, page: ListPage) => [...runKeys.detail(id), "ai-calls", page] as const,
 };
@@ -96,6 +97,15 @@ export function runDocumentsQuery(api: ApiClient, id: string, page: ListPage, li
           params: { path: { run_id: id }, query: page },
         }),
       ),
+  });
+}
+
+export function runRecordsQuery(api: ApiClient, id: string, page: ListPage, live = false) {
+  return queryOptions({
+    queryKey: runKeys.records(id, page),
+    refetchInterval: every(live),
+    queryFn: async () =>
+      unwrap(await api.GET("/records", { params: { query: { run: id, ...page } } })),
   });
 }
 
