@@ -18,6 +18,7 @@ import {
   fieldLabel,
   formatValue,
   parseRecordSearch,
+  recordTypeColumns,
   recordTypeLabels,
   recordTypes,
   type RecordSearch,
@@ -85,52 +86,85 @@ export function recordColumns(fields: string[], timeZone: string, showType: bool
   ]);
 }
 
-/** Current records of one type, with the type's fields as columns; all types when none. */
+/** One button per record type, and one for all. */
+function TypeButtons({
+  value,
+  onChange,
+}: {
+  value: RecordType | undefined;
+  onChange: (type: RecordType | undefined) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {[undefined, ...recordTypes].map((option) => (
+        <Button
+          key={option ?? "all"}
+          size="sm"
+          variant={value === option ? "default" : "outline"}
+          onClick={() => onChange(option)}
+        >
+          {option ? recordTypeLabels[option] : "All"}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The list's type and page, kept in the URL. A type's own page keeps its type
+ * out of the URL, since the path already names it.
+ */
+function useRecordFilters(initialFilters: RecordSearch, fixedType: RecordType | undefined) {
+  const [type, setType] = useState<RecordType | undefined>(fixedType ?? initialFilters.type);
+  const [page, setPage] = useState(initialFilters.page ?? 1);
+  const { deferred, isStale } = useUrlFilters(
+    { type: fixedType ? undefined : type, page: page > 1 ? page : undefined },
+    parseRecordSearch,
+  );
+  return {
+    type,
+    setType,
+    page,
+    setPage,
+    deferred: fixedType ? { ...deferred, type: fixedType } : deferred,
+    isStale,
+  };
+}
+
+/**
+ * Current records of one type, with the type's fields as columns; all types when none.
+ * With `fixedType` it is that type's own page: its chosen columns, no type buttons.
+ */
 export function RecordsTable({
   initialFilters,
   timeZone,
+  fixedType,
 }: {
   initialFilters: RecordSearch;
   timeZone: string;
+  fixedType?: RecordType;
 }) {
-  const [type, setType] = useState<RecordType | undefined>(initialFilters.type);
-  const [page, setPage] = useState(initialFilters.page ?? 1);
-  const { deferred, isStale } = useUrlFilters(
-    { type, page: page > 1 ? page : undefined },
-    parseRecordSearch,
+  const { type, setType, page, setPage, deferred, isStale } = useRecordFilters(
+    initialFilters,
+    fixedType,
   );
   const { data: types } = useSuspenseQuery(recordTypesQuery(browserApi));
   const { data: records } = useSuspenseQuery(recordListQuery(browserApi, paged(deferred)));
-  const fields = deferred.type
-    ? (types.find((t) => t.record_type === deferred.type)?.fields ?? [])
-    : [];
-
-  function choose(next: RecordType | undefined) {
-    setType(next);
-    setPage(1);
-  }
+  const fields = fixedType
+    ? recordTypeColumns[fixedType]
+    : (types.find((t) => t.record_type === deferred.type)?.fields ?? []);
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant={type === undefined ? "default" : "outline"}
-          onClick={() => choose(undefined)}
-        >
-          All
-        </Button>
-        {recordTypes.map((value) => (
-          <Button
-            key={value}
-            size="sm"
-            variant={type === value ? "default" : "outline"}
-            onClick={() => choose(value)}
-          >
-            {recordTypeLabels[value]}
-          </Button>
-        ))}
-      </div>
+      {!fixedType && (
+        <TypeButtons
+          value={type}
+          onChange={(next) => {
+            setType(next);
+            setPage(1);
+          }}
+        />
+      )}
       <DataTable<RecordSummary>
         key={deferred.type ?? "all"}
         columns={recordColumns(fields, timeZone, deferred.type === undefined)}

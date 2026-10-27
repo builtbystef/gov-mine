@@ -23,6 +23,28 @@ export const recordTypeLabels: Record<RecordType, string> = {
   contract: "Contracts",
 };
 
+/** Each record type's own page under /records, by its URL segment. */
+export const recordTypeSlugs = {
+  project: "projects",
+  news_item: "news-items",
+  meeting: "meetings",
+  contact: "contacts",
+  rfp: "rfps",
+  grant: "grants",
+  contract: "contracts",
+} as const satisfies Record<RecordType, string>;
+
+/** The fields a type's own page shows as columns, most telling first. */
+export const recordTypeColumns: Record<RecordType, string[]> = {
+  project: ["name", "phase", "location", "start_date", "end_date"],
+  news_item: ["headline", "published_at", "summary"],
+  meeting: ["held_at", "body", "video_url"],
+  contact: ["name", "title", "email", "phone"],
+  rfp: ["title", "status", "due_date", "published_at", "solicitation_number"],
+  grant: ["title", "awardee_name", "funding_agency", "obligated_amount", "performance_end"],
+  contract: ["vendor_name", "total_value", "awarded_at", "start_date", "end_date"],
+};
+
 /** Where the Records list is: the record type shown, and the page. */
 const recordSearchSchema = z.object({
   type: optionalParam(z.enum(recordTypes)),

@@ -2,6 +2,8 @@
 
 import { usePathname } from "next/navigation";
 
+import { recordTypeLabels, recordTypes, recordTypeSlugs } from "@/features/records/schemas";
+
 /**
  * The title of the current page, shown in the shell header. It is derived from
  * the URL, which is only known at request time, so it streams in behind a
@@ -31,7 +33,14 @@ export function titleFor(pathname: string): string | null {
     if (id === "new") return "Add institution";
     return action === "edit" ? "Edit institution" : "Institution";
   }
+  if (section === "records" && id !== undefined) return recordsTitle(id);
   const titles = listSections[section];
   if (titles === undefined) return null;
   return id === undefined ? titles[0] : titles[1];
+}
+
+/** A record type's own page is titled by the type; any other id is one record. */
+function recordsTitle(id: string): string {
+  const type = recordTypes.find((t) => recordTypeSlugs[t] === id);
+  return type ? recordTypeLabels[type] : "Record";
 }
