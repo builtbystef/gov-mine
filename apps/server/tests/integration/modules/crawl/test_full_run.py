@@ -5,6 +5,7 @@ CreateTO homepage and sitemap, or a small site of its own."""
 
 import asyncio
 import hashlib
+import itertools
 import json
 import logging
 import re
@@ -12,6 +13,8 @@ import time
 import uuid
 from collections import Counter
 from contextlib import suppress
+from dataclasses import dataclass
+from datetime import timedelta
 from importlib.metadata import version
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -96,27 +99,66 @@ def rows(engine: Engine, sql: str, **params: Any) -> list[dict[str, Any]]:
         return [dict(row._mapping) for row in connection.execute(text(sql), params)]  # noqa: SLF001
 
 
+@pytest.fixture(autouse=True)
+def instant_waits(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A host's delay passes at once, so a run of many pages takes no longer than its work. The
+    tests of pacing wait for real (`real_waits`)."""
+
+    async def instant(_seconds: float) -> None:
+        await asyncio.sleep(0)
+
+    monkeypatch.setattr(service, "sleep", instant)
+
+
+@pytest.fixture
+def real_waits(instant_waits: None, monkeypatch: pytest.MonkeyPatch) -> None:  # noqa: ARG001
+    monkeypatch.setattr(service, "sleep", asyncio.sleep)
+
+
+@dataclass
+class Span:
+    """One request as the website saw it: from its arrival to its response, on the monotonic
+    clock."""
+
+    url: str
+    start: float
+    end: float = 0.0
+
+
 class Website:
     """Serves `pages` (URL to body; a `.pdf` as a PDF, an `.xml` as XML, a `.txt` as text, the
     rest as HTML, unless `media_types` says otherwise), the status in `statuses` for a URL listed
-    there, and 404 for the rest. Notes the run's status and the `User-Agent` as each request
-    arrives."""
+    there, and 404 for the rest, taking `holds[url]` seconds to answer when listed there. Notes
+    the run's status, the `User-Agent` and when each request arrived and was answered."""
 
     def __init__(
         self,
         pages: dict[str, bytes] | None = None,
         media_types: dict[str, str] | None = None,
         statuses: dict[str, int] | None = None,
+        holds: dict[str, float] | None = None,
     ) -> None:
         self.pages = pages if pages is not None else {"https://createto.ca/": HOMEPAGE}
         self.media_types = media_types or {}
         self.statuses = statuses or {}
+        self.holds = holds or {}
         self.requests: list[str] = []
+        self.spans: list[Span] = []
         self.user_agents: list[str | None] = []
         self.status_during_fetch: list[str] = []
         self.session_factory: Any = None
 
     async def __call__(self, request: httpx.Request) -> httpx.Response:
+        span = Span(str(request.url), time.monotonic())
+        self.spans.append(span)
+        try:
+            response = await self.answer(request)
+            await asyncio.sleep(self.holds.get(span.url, 0))
+            return response
+        finally:
+            span.end = time.monotonic()
+
+    async def answer(self, request: httpx.Request) -> httpx.Response:
         url = str(request.url)
         self.requests.append(url)
         self.user_agents.append(request.headers.get("User-Agent"))
@@ -187,7 +229,8 @@ async def start(settings: Settings, run_id: str, website: Website) -> list[dict[
             await session.commit()
             jobs = await session.execute(
                 text(
-                    "SELECT w.url, (j.args->>'depth')::int AS depth FROM procrastinate_jobs j"
+                    "SELECT w.url, (j.args->>'depth')::int AS depth, j.lock"
+                    " FROM procrastinate_jobs j"
                     " JOIN webpages w ON w.id = (j.args->>'webpage_id')::uuid"
                     " WHERE j.task_name = 'crawl.fetch' AND j.args->>'run_id' = :id ORDER BY j.id"
                 ),
@@ -196,7 +239,9 @@ async def start(settings: Settings, run_id: str, website: Website) -> list[dict[
             return [dict(row._mapping) for row in jobs]  # noqa: SLF001
 
 
-async def crawl(settings: Settings, run_id: str, website: Website) -> MemoryObjectStore:
+async def crawl(
+    settings: Settings, run_id: str, website: Website, *, concurrency: int = 2
+) -> MemoryObjectStore:
     """Run a worker until the run is no longer queued or running, and return what it stored."""
     store = MemoryObjectStore()
     async with (
@@ -208,9 +253,9 @@ async def crawl(settings: Settings, run_id: str, website: Website) -> MemoryObje
             resources.jobs.run_worker_async(
                 install_signal_handlers=False,
                 additional_context=worker_context(resources),
-                # `crawl.finish` can then run while the fetch does, and must wait for it.
-                concurrency=2,
-                fetch_job_polling_interval=0.1,
+                # At 2, `crawl.finish` can run while the fetch does, and must wait for it.
+                concurrency=concurrency,
+                fetch_job_polling_interval=0.02,
             )
         )
         try:
@@ -549,9 +594,12 @@ def test_a_full_run_seeds_every_url_of_the_saved_createto_sitemap_at_depth_0(
     assert website.requests == [SITEMAP, f"{SITE}/sitemap-0.xml"]
     # The homepage and every listed URL queued once, all at depth 0. The sitemap lists the
     # homepage itself, as https://createto.ca.
-    assert seeds[0] == {"url": f"{SITE}/", "depth": 0}
+    assert seeds[0]["url"] == f"{SITE}/"
     assert Counter(seed["url"] for seed in seeds) == Counter({f"{SITE}/", *listed})
     assert {seed["depth"] for seed in seeds} == {0}
+    # Each locked by its host's domain, so the host is fetched one request at a time.
+    (domain,) = rows(database, "SELECT id FROM domains")
+    assert {seed["lock"] for seed in seeds} == {str(domain["id"])}
 
     asyncio.run(crawl(crawl_settings, run_id, website))
 
@@ -865,3 +913,76 @@ def test_every_request_identifies_the_crawler_as_my_bot(crawl_settings: Settings
     # The sitemap, robots.txt of both hosts, both pages and the file.
     assert len(website.requests) == 6
     assert set(website.user_agents) == {USER_AGENT}
+
+
+def gaps(spans: list[Span]) -> list[float]:
+    """The seconds between the starts of consecutive requests."""
+    return [later.start - earlier.start for earlier, later in itertools.pairwise(spans)]
+
+
+@pytest.mark.usefixtures("real_waits")
+def test_a_host_is_sent_one_request_at_a_time_its_delay_apart_alongside_other_hosts(
+    crawl_settings: Settings, database: Engine
+):
+    run_id = create_run()
+    merx = "https://www.merx.com"
+    createto_pages = [f"{SITE}/a", f"{SITE}/b", f"{SITE}/c", f"{SITE}/d"]
+    website = Website(
+        {
+            # MERX's robots.txt asks for Crawl-delay: 5; createto.ca has none (404): 1 s.
+            f"{merx}/robots.txt": MERX_ROBOTS.read_bytes(),
+            f"{SITE}/": page(*createto_pages, f"{merx}/public/notice.pdf"),
+            **dict.fromkeys(createto_pages, page()),
+            f"{merx}/public/notice.pdf": b"%PDF-1.4",
+        },
+        holds={
+            # Longer than the delay: the next request waits for the answer, not just 1 s.
+            f"{SITE}/a": 1.5,
+            # Answered after createto.ca's next request is due, which must not wait for it.
+            f"{merx}/robots.txt": 1.5,
+        },
+    )
+
+    asyncio.run(crawl(crawl_settings, run_id, website, concurrency=4))
+
+    (run,) = rows(database, "SELECT status FROM crawl_runs")
+    assert run["status"] == "finished"
+    by_host: dict[str, list[Span]] = {}
+    for span in sorted(website.spans, key=lambda span: span.start):
+        by_host.setdefault(urlsplit(span.url).hostname or "", []).append(span)
+    # The sitemap, robots.txt, the homepage and its four pages; robots.txt and the file.
+    assert {host: len(spans) for host, spans in by_host.items()} == {
+        "createto.ca": 7,
+        "www.merx.com": 2,
+    }
+    # No two requests to a host overlap.
+    for spans in by_host.values():
+        for earlier, later in itertools.pairwise(spans):
+            assert later.start >= earlier.end, (earlier, later)
+    # Consecutive requests start the host's delay apart, robots.txt and the sitemap included
+    # (give or take the client's own few milliseconds between noting a request and sending it).
+    assert min(gaps(by_host["createto.ca"])) >= 1.0 - 0.02
+    assert min(gaps(by_host["www.merx.com"])) >= 5.0 - 0.02
+    # What the fetch log says: each sent request's requested_at is when it was sent.
+    sent = sorted(
+        fetch["requested_at"]
+        for url, fetch in fetches_by_url(database, run_id).items()
+        if url.startswith(SITE)
+    )
+    assert len(sent) == 5
+    assert min(b - a for a, b in itertools.pairwise(sent)) >= timedelta(seconds=1)
+    # The two hosts were requested at the same time: createto.ca's next page was sent while
+    # MERX's robots.txt was still being answered.
+    (robots,) = [span for span in website.spans if span.url == f"{merx}/robots.txt"]
+    assert any(robots.start < span.start < robots.end for span in by_host["createto.ca"]), (
+        website.spans
+    )
+    domains = {
+        row["name"]: row
+        for row in rows(database, "SELECT name, crawl_delay_ms, last_request_at FROM domains")
+    }
+    assert {name: domain["crawl_delay_ms"] for name, domain in domains.items()} == {
+        "createto.ca": 1000,
+        "www.merx.com": 5000,
+    }
+    assert domains["createto.ca"]["last_request_at"] == sent[-1]

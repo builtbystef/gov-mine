@@ -64,10 +64,12 @@ async def defer(
     task: AnyTask,
     *,
     schedule_in: timedelta | None = None,
+    lock: str | None = None,
     **kwargs: JSONValue,
 ) -> int:
     """Queue one run in `session`'s transaction and return its job ID; with
-    `schedule_in`, no worker picks it up before then. The job row
+    `schedule_in`, no worker picks it up before then, and with `lock`, none while
+    another job with the same lock runs, nor before the ones queued with it earlier. The job row
     is written on the session's own connection, so it is committed, or rolled
     back, with the rows it is about; a worker is notified at commit, never before.
     (Sessions run on psycopg, which is the connection Procrastinate accepts; this
@@ -78,6 +80,7 @@ async def defer(
     deferrer = task.configure(
         connection=connection.driver_connection,
         schedule_in=None if schedule_in is None else {"seconds": int(schedule_in.total_seconds())},
+        lock=lock,
     )
     # `Trace` is `dict[str, str]`, which is not a `JSONValue` (dicts are invariant).
     carrier: dict[str, JSONValue] = {**trace()}

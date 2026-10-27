@@ -55,6 +55,9 @@ class Domain(UUIDPrimaryKey, CreatedAt, Base):
     robots_txt: Mapped[str | None] = mapped_column(Text)
     robots_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     crawl_delay_ms: Mapped[int] = mapped_column(default=DEFAULT_CRAWL_DELAY_MS)
+    # When the crawler last sent the host a request, of any kind: the next waits
+    # `crawl_delay_ms` from here.
+    last_request_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Webpage(UUIDPrimaryKey, CreatedAt, Base):

@@ -1,11 +1,13 @@
 """The crawl: starting a run from the homepage and the sitemap, fetching a page into the fetch
-log (once its host's robots.txt allows it) and queueing the links it holds one link deeper, and
-finishing the run when its jobs are done. The jobs in jobs.py call these, one transaction each."""
+log (once its host's robots.txt allows it, and its delay has passed) and queueing the links it
+holds one link deeper, and finishing the run when its jobs are done. The jobs in jobs.py call
+these, one transaction each."""
 
+import asyncio
 import logging
 import time
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 from urllib.parse import urljoin, urlsplit
 
 import httpx
@@ -55,6 +57,10 @@ MAX_URL_LENGTH = 2048
 SITEMAP_PATH = "/sitemap.xml"
 # The most sitemap files a run reads, the index included: an index can point to thousands.
 MAX_SITEMAPS = 50
+
+# How the crawl waits out a host's delay. Tests that are not about pacing swap it for one that
+# does not wait.
+sleep = asyncio.sleep
 
 # Whether any job of the run other than `crawl.finish` is waiting or running. Every job of a
 # run carries its `run_id`; a job queues its follow-ups in its own transaction, before it is
@@ -133,10 +139,52 @@ async def queue(
     task_name: str,
     *,
     schedule_in: timedelta | None = None,
+    lock: str | None = None,
     **kwargs: JSONValue,
 ) -> int:
     """One of the crawl's jobs, in `session`'s transaction."""
-    return await defer(session, registry.tasks[task_name], schedule_in=schedule_in, **kwargs)
+    return await defer(
+        session, registry.tasks[task_name], schedule_in=schedule_in, lock=lock, **kwargs
+    )
+
+
+async def queue_fetch(
+    session: AsyncSession, run_id: uuid.UUID, webpage: uuid.UUID, domain: uuid.UUID, depth: int
+) -> int:
+    """A `crawl.fetch` of `webpage` at `depth`, locked by its domain, so the host's fetches run
+    one at a time, in the order they were queued, however many workers there are."""
+    return await queue(
+        session,
+        FETCH_TASK,
+        lock=str(domain),
+        run_id=str(run_id),
+        webpage_id=str(webpage),
+        depth=depth,
+    )
+
+
+async def wait_for_host(session: AsyncSession, domain_id: uuid.UUID) -> datetime:
+    """Wait until the host's `crawl_delay_ms` has passed since its last request, then note now
+    as its last request and return it: call it right before sending one. The domain row stays
+    locked until the transaction ends, so a job outside the fetch lock (`crawl.start`) cannot
+    send the host a request meanwhile either."""
+    domain = (
+        await session.scalars(
+            select(Domain)
+            .where(Domain.id == domain_id)
+            # Not FOR UPDATE: it would hold back the webpages inserted for this host.
+            .with_for_update(key_share=True)
+            .execution_options(populate_existing=True)
+        )
+    ).one()
+    if domain.last_request_at is not None:
+        due = domain.last_request_at + timedelta(milliseconds=domain.crawl_delay_ms)
+        wait = (due - utcnow()).total_seconds()
+        if wait > 0:
+            await sleep(wait)
+    sent = domain.last_request_at = utcnow()
+    await session.flush()
+    return sent
 
 
 async def start_run(session: AsyncSession, http: httpx.AsyncClient, run_id: uuid.UUID) -> None:
@@ -153,17 +201,20 @@ async def start_run(session: AsyncSession, http: httpx.AsyncClient, run_id: uuid
     homepage_url = normalise_url(institution.website_url)
     domain = await ensure_domain(session, host_of(homepage_url), CrawlPolicy.CRAWL)
     homepage = await ensure_webpage(session, homepage_url, domain.id)
-    await queue(session, FETCH_TASK, run_id=str(run.id), webpage_id=str(homepage.id), depth=0)
-    seeds = await read_sitemap(http, homepage_url)
+    await queue_fetch(session, run.id, homepage.id, domain.id, 0)
+    seeds = await read_sitemap(session, http, domain.id, homepage_url)
     queued = await queue_links(session, run.id, None, seeds, 0)
     logger.info("Run %s seeded with the homepage and %d sitemap URLs", run.id, queued)
     await queue(session, FINISH_TASK, run_id=str(run.id))
 
 
-async def read_sitemap(http: httpx.AsyncClient, homepage_url: str) -> list[str]:
-    """The normalised page URLs listed by `/sitemap.xml` on the homepage's host, and, when it
-    is an index, by the sitemap files it points to on the same host, each once. A file that is
-    missing, fails, or is not a sitemap adds nothing; at most `MAX_SITEMAPS` files are read."""
+async def read_sitemap(
+    session: AsyncSession, http: httpx.AsyncClient, domain_id: uuid.UUID, homepage_url: str
+) -> list[str]:
+    """The normalised page URLs listed by `/sitemap.xml` on the homepage's host (its domain is
+    `domain_id`), and, when it is an index, by the sitemap files it points to on the same host,
+    each once, paced like any request to the host. A file that is missing, fails, or is not a
+    sitemap adds nothing; at most `MAX_SITEMAPS` files are read."""
     host = host_of(homepage_url)
     pending = [urljoin(homepage_url, SITEMAP_PATH)]
     seen = set(pending)
@@ -172,6 +223,7 @@ async def read_sitemap(http: httpx.AsyncClient, homepage_url: str) -> list[str]:
         if not pending:
             break
         url = pending.pop(0)
+        await wait_for_host(session, domain_id)
         try:
             response = await http.get(url)
         except httpx.HTTPError as exc:
@@ -240,6 +292,7 @@ async def robots_refusal(
             )
         ).one()
         if _robots_stale(domain, run):
+            await wait_for_host(session, domain.id)
             await read_robots(http, domain, url)
     if domain.robots_txt is None:
         return FetchOutcome.BLOCKED_ROBOTS, "robots_unreachable"
@@ -296,7 +349,8 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
     `ingest.store`: `fetched` with the new snapshot, or `unchanged` when the bytes are the ones
     already kept; an HTML page on a `crawl` host then queues its links one link deeper (what a
     `files_only` host serves is never followed, whatever its type). Any other status is
-    `failed_http`, and a timeout `failed_timeout`."""
+    `failed_http`, and a timeout `failed_timeout`. A request, robots.txt's included, first waits
+    out the host's delay; a sent request's `requested_at` is when it was sent."""
     run = await get_run(session, run_id)
     limit = run.settings.get("limit")
     if limit is not None:
@@ -317,6 +371,7 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
         session.add(fetch)
         await session.flush()
         return fetch
+    fetch.requested_at = await wait_for_host(session, domain.id)
     started = time.perf_counter()
     try:
         response = await http.get(webpage.url)
@@ -394,7 +449,7 @@ async def queue_links(
         if ids[url] in in_run:
             continue
         in_run.add(ids[url])
-        await queue(session, FETCH_TASK, run_id=str(run_id), webpage_id=str(ids[url]), depth=depth)
+        await queue_fetch(session, run_id, ids[url], domains[host_of(url)], depth)
         queued += 1
     return queued
 
@@ -432,10 +487,12 @@ __all__ = [
     "lock_run",
     "media_type_of",
     "queue",
+    "queue_fetch",
     "queue_links",
     "read_robots",
     "read_sitemap",
     "refusal",
     "robots_refusal",
     "start_run",
+    "wait_for_host",
 ]
