@@ -21,7 +21,7 @@ from gov_mine.resources import build_resources
 from gov_mine.shared.exceptions import AppError
 
 app = typer.Typer()
-run_app = typer.Typer(help="Create crawl runs.")
+run_app = typer.Typer(help="Create crawl runs and report on them.")
 app.add_typer(run_app, name="run")
 dev_app = typer.Typer(help="Development tools.")
 app.add_typer(dev_app, name="dev")
@@ -131,3 +131,15 @@ def dev_replay(
     server = replay_app(from_, variants=not as_saved)
     typer.echo(f"Replaying {from_} at http://{host}:{port}")
     uvicorn.run(server, host=host, port=port, log_level="warning")
+
+
+@run_app.command("report")
+def run_report(
+    run_id: Annotated[uuid.UUID, typer.Argument(help="The run to report on.")],
+    as_json: Annotated[  # noqa: FBT002 - a Typer flag
+        bool, typer.Option("--json", help="Print the numbers as JSON.")
+    ] = False,
+) -> None:
+    """Print a run's numbers as markdown tables, each a query over its logs."""
+    report = _run(lambda session: runs.report(session, run_id))
+    typer.echo(report.model_dump_json(indent=2) if as_json else runs.report_markdown(report))

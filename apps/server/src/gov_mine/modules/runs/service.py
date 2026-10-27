@@ -8,18 +8,25 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gov_mine.db.base import utcnow
+from gov_mine.modules.classify.models import Classification, Document
 from gov_mine.modules.crawl import service as crawl
 from gov_mine.modules.crawl.models import CrawlRun, Fetch, FetchOutcome, RunStatus, Webpage
 from gov_mine.modules.extract import service as extract
-from gov_mine.modules.ingest.models import WebpageSnapshot
+from gov_mine.modules.ingest.models import TextStatus, WebpageSnapshot
 from gov_mine.modules.institutions import service as institutions
 from gov_mine.modules.institutions.models import Institution
 from gov_mine.modules.ledger.models import AICall
 from gov_mine.modules.runs.schemas import (
     FetchOutput,
+    OutcomeCount,
+    ProviderCost,
+    PurposeCalls,
+    RecordCounts,
+    RemovedDocument,
     RunCounts,
     RunMode,
     RunOutput,
+    RunReport,
     RunSettings,
     RunTrigger,
     SnapshotSummary,
@@ -217,4 +224,254 @@ async def list_fetches(
     return items, total
 
 
-__all__ = ["create_run", "list_fetches", "list_runs", "read_run"]
+async def _records(_session: AsyncSession, _run_id: uuid.UUID) -> RecordCounts | None:
+    """Records created and amended in the run. TODO(023): wire up once `records` and
+    `record_snapshots` exist: created = records whose first record snapshot's extraction has
+    this `crawl_run_id`, amended = record snapshots of the run's extractions that are not
+    their record's first. Null until then, which the report prints as not available."""
+    return None
+
+
+async def _unextracted(_session: AsyncSession, _run_id: uuid.UUID) -> list[uuid.UUID] | None:
+    """Documents left unextracted because their extraction in the run failed. TODO(023): the
+    documents whose webpage snapshot has an `extractions` row of this run with `error` set."""
+    return None
+
+
+async def _fallback_reasons(
+    _session: AsyncSession, _run_id: uuid.UUID
+) -> dict[str, dict[str, int]] | None:
+    """`fallback_reason` counts per source. TODO(023): the run's `extractions` with
+    `fallback_reason` set, grouped by their document's `source_id` and the reason."""
+    return None
+
+
+async def report(session: AsyncSession, run_id: uuid.UUID) -> RunReport:
+    """The run's numbers, every one a query over the logs. Raises `NotFoundError` for an
+    unknown run."""
+    run = await read_run(session, run_id)
+    in_run = Fetch.crawl_run_id == run_id
+    sent = Fetch.duration_ms.is_not(None)
+
+    outcomes = [
+        OutcomeCount(outcome=outcome, fetches=fetches, requests=requests)
+        for outcome, fetches, requests in await session.execute(
+            select(Fetch.outcome, func.count(), func.count().filter(sent))
+            .where(in_run)
+            .group_by(Fetch.outcome)
+            .order_by(Fetch.outcome)
+        )
+    ]
+
+    written = select(Fetch.snapshot_id).where(in_run, Fetch.snapshot_id.is_not(None))
+    status_counts = dict(
+        (
+            await session.execute(
+                select(WebpageSnapshot.text_status, func.count())
+                .where(WebpageSnapshot.id.in_(written))
+                .group_by(WebpageSnapshot.text_status)
+            )
+        ).all()
+    )
+    parsing = status_counts.get(TextStatus.PARSING, 0)
+
+    classified_in_run = (
+        select(WebpageSnapshot.webpage_id)
+        .join(Classification, Classification.snapshot_id == WebpageSnapshot.id)
+        .where(Classification.crawl_run_id == run_id)
+    )
+    changed_in_run = select(WebpageSnapshot.webpage_id).where(WebpageSnapshot.id.in_(written))
+    documents_new = await session.scalar(
+        select(func.count()).select_from(Document).where(Document.webpage_id.in_(classified_in_run))
+    )
+    documents_changed = await session.scalar(
+        select(func.count())
+        .select_from(Document)
+        .where(
+            Document.webpage_id.in_(changed_in_run),
+            Document.webpage_id.not_in(classified_in_run),
+        )
+    )
+
+    by_purpose = [
+        PurposeCalls(
+            purpose=purpose,
+            calls=calls,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            estimated_cost=cost,
+            reported_cost=reported,
+        )
+        for purpose, calls, input_tokens, output_tokens, cost, reported in await session.execute(
+            select(
+                AICall.purpose,
+                func.count(),
+                func.sum(AICall.input_tokens),
+                func.sum(AICall.output_tokens),
+                func.sum(AICall.cost),
+                func.sum(AICall.reported_cost),
+            )
+            .where(AICall.crawl_run_id == run_id)
+            .group_by(AICall.purpose)
+            .order_by(AICall.purpose)
+        )
+    ]
+    by_provider = [
+        ProviderCost(
+            provider=provider,
+            calls=calls,
+            estimated_cost=cost,
+            reported_cost=reported,
+            calls_without_reported_cost=unreported,
+        )
+        for provider, calls, cost, reported, unreported in await session.execute(
+            select(
+                AICall.provider,
+                func.count(),
+                func.sum(AICall.cost),
+                func.sum(AICall.reported_cost),
+                func.count().filter(AICall.reported_cost.is_(None)),
+            )
+            .where(AICall.crawl_run_id == run_id)
+            .group_by(AICall.provider)
+            .order_by(AICall.provider)
+        )
+    ]
+
+    # `missing_since` is the requested_at of the first 404, so equal to one of the run's fetches
+    # only when the page went missing in this run.
+    removed = [
+        RemovedDocument(document_id=document_id, url=url, title=title, missing_since=since)
+        for document_id, url, title, since in await session.execute(
+            select(Document.id, Webpage.url, Document.title, Fetch.requested_at)
+            .join(Webpage, Webpage.id == Document.webpage_id)
+            .join(
+                Fetch,
+                (Fetch.webpage_id == Webpage.id)
+                & in_run
+                & (Fetch.requested_at == Webpage.missing_since),
+            )
+            .order_by(Webpage.url)
+        )
+    ]
+
+    elapsed = (
+        (run.finished_at - run.started_at).total_seconds()
+        if run.started_at is not None and run.finished_at is not None
+        else None
+    )
+    return RunReport(
+        run=run,
+        elapsed_seconds=elapsed,
+        requests_sent=sum(count.requests for count in outcomes),
+        fetches_by_outcome=outcomes,
+        snapshots_written=sum(status_counts.values()),
+        files_processed=sum(status_counts.values()) - parsing,
+        files_failed=status_counts.get(TextStatus.FAILED, 0),
+        files_parsing=parsing,
+        documents_new=documents_new or 0,
+        documents_changed=documents_changed or 0,
+        records=await _records(session, run_id),
+        paid_calls=sum(purpose.calls for purpose in by_purpose),
+        estimated_cost=sum((purpose.estimated_cost for purpose in by_purpose), Decimal(0)),
+        reported_cost=await session.scalar(
+            select(func.sum(AICall.reported_cost)).where(AICall.crawl_run_id == run_id)
+        ),
+        calls_by_purpose=by_purpose,
+        cost_by_provider=by_provider,
+        removed_documents=removed,
+        unextracted_document_ids=await _unextracted(session, run_id),
+        fallback_reasons_by_source=await _fallback_reasons(session, run_id),
+    )
+
+
+_NOT_AVAILABLE = "not available (no extraction yet)"
+
+
+def _usd(amount: Decimal | None) -> str:
+    return "none reported" if amount is None else f"${amount:.6f}"
+
+
+def report_markdown(report: RunReport) -> str:
+    """The report as markdown tables, for the README and the terminal."""
+    run = report.run
+    elapsed = (
+        "not finished" if report.elapsed_seconds is None else f"{report.elapsed_seconds:.1f} s"
+    )
+    records = (
+        (_NOT_AVAILABLE, _NOT_AVAILABLE)
+        if report.records is None
+        else (str(report.records.created), str(report.records.amended))
+    )
+    rows = [
+        ("Run", f"{run.id} ({run.institution_name}, {run.settings.mode}, {run.status})"),
+        ("Time taken", elapsed),
+        ("Requests sent", str(report.requests_sent)),
+        ("Snapshots written", str(report.snapshots_written)),
+        ("Files processed", str(report.files_processed)),
+        ("Files failed", str(report.files_failed)),
+        ("Files still parsing", str(report.files_parsing)),
+        ("Documents new", str(report.documents_new)),
+        ("Documents changed", str(report.documents_changed)),
+        ("Documents removed", str(len(report.removed_documents))),
+        ("Records created", records[0]),
+        ("Records amended", records[1]),
+        ("Paid calls", str(report.paid_calls)),
+        ("Cost, estimated from the price list", _usd(report.estimated_cost)),
+        ("Cost, reported by OpenRouter", _usd(report.reported_cost)),
+    ]
+    lines = ["| Number | Value |", "| --- | --- |", *(f"| {k} | {v} |" for k, v in rows)]
+
+    lines += ["", "| Fetch outcome | Fetches | Requests sent |", "| --- | ---: | ---: |"]
+    lines += [f"| {o.outcome} | {o.fetches} | {o.requests} |" for o in report.fetches_by_outcome]
+
+    lines += [
+        "",
+        (
+            "| Paid calls by purpose | Calls | Input tokens | Output tokens"
+            " | Estimated (price list) | Reported (OpenRouter) |"
+        ),
+        "| --- | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    lines += [
+        f"| {p.purpose} | {p.calls} | {p.input_tokens} | {p.output_tokens}"
+        f" | {_usd(p.estimated_cost)} | {_usd(p.reported_cost)} |"
+        for p in report.calls_by_purpose
+    ]
+
+    lines += [
+        "",
+        (
+            "| Cost by provider | Calls | Estimated (price list) | Reported (OpenRouter)"
+            " | Calls with no reported cost |"
+        ),
+        "| --- | ---: | ---: | ---: | ---: |",
+    ]
+    lines += [
+        f"| {p.provider} | {p.calls} | {_usd(p.estimated_cost)} | {_usd(p.reported_cost)}"
+        f" | {p.calls_without_reported_cost} |"
+        for p in report.cost_by_provider
+    ]
+
+    lines += ["", "Removed documents (webpage went missing in this run):"]
+    lines += [f"- {d.url} ({d.title or 'untitled'})" for d in report.removed_documents] or [
+        "- none"
+    ]
+    lines += ["", "Unextracted documents (extraction failed):"]
+    if report.unextracted_document_ids is None:
+        lines.append(f"- {_NOT_AVAILABLE}")
+    else:
+        lines += [f"- {i}" for i in report.unextracted_document_ids] or ["- none"]
+    lines += ["", "Fallback reasons per source:"]
+    if report.fallback_reasons_by_source is None:
+        lines.append(f"- {_NOT_AVAILABLE}")
+    else:
+        lines += [
+            f"- {source}: {reason} {count}"
+            for source, reasons in report.fallback_reasons_by_source.items()
+            for reason, count in reasons.items()
+        ] or ["- none"]
+    return "\n".join(lines)
+
+
+__all__ = ["create_run", "list_fetches", "list_runs", "read_run", "report", "report_markdown"]

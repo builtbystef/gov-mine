@@ -146,6 +146,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/runs/{run_id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Report
+         * @description The run's numbers, each a query over its logs. Costs come from `ai_calls`: estimated from
+         *     the price list, and as reported by OpenRouter.
+         */
+        get: operations["runs-read_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/runs/{run_id}/fetches": {
         parameters: {
             query?: never;
@@ -457,6 +478,17 @@ export interface components {
              */
             created_at: string;
         };
+        /**
+         * OutcomeCount
+         * @description The run's `fetches` rows with one outcome; `requests` are those that sent a request.
+         */
+        OutcomeCount: {
+            outcome: components["schemas"]["FetchOutcome"];
+            /** Fetches */
+            fetches: number;
+            /** Requests */
+            requests: number;
+        };
         /** Page[AICallOutput] */
         Page_AICallOutput_: {
             /** Items */
@@ -511,6 +543,68 @@ export interface components {
             limit: number;
             /** Offset */
             offset: number;
+        };
+        /**
+         * ProviderCost
+         * @description Like `PurposeCalls`, per provider. `calls_without_reported_cost` are left out of
+         *     `reported_cost`.
+         */
+        ProviderCost: {
+            /** Provider */
+            provider: string;
+            /** Calls */
+            calls: number;
+            /** Estimated Cost */
+            estimated_cost: string;
+            /** Reported Cost */
+            reported_cost: string | null;
+            /** Calls Without Reported Cost */
+            calls_without_reported_cost: number;
+        };
+        /**
+         * PurposeCalls
+         * @description Paid calls for one purpose. `estimated_cost` is USD from the price list; `reported_cost`
+         *     is what OpenRouter said it charged, summed over the calls it reported a cost for.
+         */
+        PurposeCalls: {
+            purpose: components["schemas"]["AIPurpose"];
+            /** Calls */
+            calls: number;
+            /** Input Tokens */
+            input_tokens: number;
+            /** Output Tokens */
+            output_tokens: number;
+            /** Estimated Cost */
+            estimated_cost: string;
+            /** Reported Cost */
+            reported_cost: string | null;
+        };
+        /** RecordCounts */
+        RecordCounts: {
+            /** Created */
+            created: number;
+            /** Amended */
+            amended: number;
+        };
+        /**
+         * RemovedDocument
+         * @description A document whose webpage first returned 404 in the run.
+         */
+        RemovedDocument: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Url */
+            url: string;
+            /** Title */
+            title: string | null;
+            /**
+             * Missing Since
+             * Format: date-time
+             */
+            missing_since: string;
         };
         /**
          * RunCounts
@@ -580,6 +674,54 @@ export interface components {
             /** Elapsed Seconds */
             elapsed_seconds: number | null;
             counts: components["schemas"]["RunCounts"];
+        };
+        /**
+         * RunReport
+         * @description A run's numbers, each a query over the logs. `elapsed_seconds` is null until the run has
+         *     finished. `records`, `unextracted_document_ids` and `fallback_reasons_by_source` are null
+         *     while extraction (023) does not exist.
+         */
+        RunReport: {
+            run: components["schemas"]["RunOutput"];
+            /** Elapsed Seconds */
+            elapsed_seconds: number | null;
+            /** Requests Sent */
+            requests_sent: number;
+            /** Fetches By Outcome */
+            fetches_by_outcome: components["schemas"]["OutcomeCount"][];
+            /** Snapshots Written */
+            snapshots_written: number;
+            /** Files Processed */
+            files_processed: number;
+            /** Files Failed */
+            files_failed: number;
+            /** Files Parsing */
+            files_parsing: number;
+            /** Documents New */
+            documents_new: number;
+            /** Documents Changed */
+            documents_changed: number;
+            records: components["schemas"]["RecordCounts"] | null;
+            /** Paid Calls */
+            paid_calls: number;
+            /** Estimated Cost */
+            estimated_cost: string;
+            /** Reported Cost */
+            reported_cost: string | null;
+            /** Calls By Purpose */
+            calls_by_purpose: components["schemas"]["PurposeCalls"][];
+            /** Cost By Provider */
+            cost_by_provider: components["schemas"]["ProviderCost"][];
+            /** Removed Documents */
+            removed_documents: components["schemas"]["RemovedDocument"][];
+            /** Unextracted Document Ids */
+            unextracted_document_ids: string[] | null;
+            /** Fallback Reasons By Source */
+            fallback_reasons_by_source: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            } | null;
         };
         /**
          * RunSettings
@@ -685,14 +827,20 @@ export type InstitutionInput = components['schemas']['InstitutionInput'];
 export type InstitutionOutput = components['schemas']['InstitutionOutput'];
 export type InstitutionType = components['schemas']['InstitutionType'];
 export type LastRun = components['schemas']['LastRun'];
+export type OutcomeCount = components['schemas']['OutcomeCount'];
 export type PageAiCallOutput = components['schemas']['Page_AICallOutput_'];
 export type PageFetchOutput = components['schemas']['Page_FetchOutput_'];
 export type PageInstitutionOutput = components['schemas']['Page_InstitutionOutput_'];
 export type PageRunOutput = components['schemas']['Page_RunOutput_'];
 export type PageSourceOutput = components['schemas']['Page_SourceOutput_'];
+export type ProviderCost = components['schemas']['ProviderCost'];
+export type PurposeCalls = components['schemas']['PurposeCalls'];
+export type RecordCounts = components['schemas']['RecordCounts'];
+export type RemovedDocument = components['schemas']['RemovedDocument'];
 export type RunCounts = components['schemas']['RunCounts'];
 export type RunCreate = components['schemas']['RunCreate'];
 export type RunOutput = components['schemas']['RunOutput'];
+export type RunReport = components['schemas']['RunReport'];
 export type RunSettings = components['schemas']['RunSettings'];
 export type RunStatus = components['schemas']['RunStatus'];
 export type SnapshotSummary = components['schemas']['SnapshotSummary'];
@@ -974,6 +1122,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunOutput"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    "runs-read_report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunReport"];
                 };
             };
             /** @description Validation Error */

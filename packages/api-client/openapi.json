@@ -403,6 +403,50 @@
         }
       }
     },
+    "/runs/{run_id}/report": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Read Report",
+        "description": "The run's numbers, each a query over its logs. Costs come from `ai_calls`: estimated from\nthe price list, and as reported by OpenRouter.",
+        "operationId": "runs-read_report",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/runs/{run_id}/fetches": {
       "get": {
         "tags": [
@@ -1249,6 +1293,29 @@
         ],
         "title": "LastRun"
       },
+      "OutcomeCount": {
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/FetchOutcome"
+          },
+          "fetches": {
+            "type": "integer",
+            "title": "Fetches"
+          },
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          }
+        },
+        "type": "object",
+        "required": [
+          "outcome",
+          "fetches",
+          "requests"
+        ],
+        "title": "OutcomeCount",
+        "description": "The run's `fetches` rows with one outcome; `requests` are those that sent a request."
+      },
       "Page_AICallOutput_": {
         "properties": {
           "items": {
@@ -1403,6 +1470,148 @@
           "offset"
         ],
         "title": "Page[SourceOutput]"
+      },
+      "ProviderCost": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "calls": {
+            "type": "integer",
+            "title": "Calls"
+          },
+          "estimated_cost": {
+            "type": "string",
+            "title": "Estimated Cost"
+          },
+          "reported_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Cost"
+          },
+          "calls_without_reported_cost": {
+            "type": "integer",
+            "title": "Calls Without Reported Cost"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "calls",
+          "estimated_cost",
+          "reported_cost",
+          "calls_without_reported_cost"
+        ],
+        "title": "ProviderCost",
+        "description": "Like `PurposeCalls`, per provider. `calls_without_reported_cost` are left out of\n`reported_cost`."
+      },
+      "PurposeCalls": {
+        "properties": {
+          "purpose": {
+            "$ref": "#/components/schemas/AIPurpose"
+          },
+          "calls": {
+            "type": "integer",
+            "title": "Calls"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          },
+          "estimated_cost": {
+            "type": "string",
+            "title": "Estimated Cost"
+          },
+          "reported_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Cost"
+          }
+        },
+        "type": "object",
+        "required": [
+          "purpose",
+          "calls",
+          "input_tokens",
+          "output_tokens",
+          "estimated_cost",
+          "reported_cost"
+        ],
+        "title": "PurposeCalls",
+        "description": "Paid calls for one purpose. `estimated_cost` is USD from the price list; `reported_cost`\nis what OpenRouter said it charged, summed over the calls it reported a cost for."
+      },
+      "RecordCounts": {
+        "properties": {
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "amended": {
+            "type": "integer",
+            "title": "Amended"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created",
+          "amended"
+        ],
+        "title": "RecordCounts"
+      },
+      "RemovedDocument": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "missing_since": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Missing Since"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "url",
+          "title",
+          "missing_since"
+        ],
+        "title": "RemovedDocument",
+        "description": "A document whose webpage first returned 404 in the run."
       },
       "RunCounts": {
         "properties": {
@@ -1561,6 +1770,165 @@
           "counts"
         ],
         "title": "RunOutput"
+      },
+      "RunReport": {
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/RunOutput"
+          },
+          "elapsed_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elapsed Seconds"
+          },
+          "requests_sent": {
+            "type": "integer",
+            "title": "Requests Sent"
+          },
+          "fetches_by_outcome": {
+            "items": {
+              "$ref": "#/components/schemas/OutcomeCount"
+            },
+            "type": "array",
+            "title": "Fetches By Outcome"
+          },
+          "snapshots_written": {
+            "type": "integer",
+            "title": "Snapshots Written"
+          },
+          "files_processed": {
+            "type": "integer",
+            "title": "Files Processed"
+          },
+          "files_failed": {
+            "type": "integer",
+            "title": "Files Failed"
+          },
+          "files_parsing": {
+            "type": "integer",
+            "title": "Files Parsing"
+          },
+          "documents_new": {
+            "type": "integer",
+            "title": "Documents New"
+          },
+          "documents_changed": {
+            "type": "integer",
+            "title": "Documents Changed"
+          },
+          "records": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecordCounts"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "paid_calls": {
+            "type": "integer",
+            "title": "Paid Calls"
+          },
+          "estimated_cost": {
+            "type": "string",
+            "title": "Estimated Cost"
+          },
+          "reported_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Cost"
+          },
+          "calls_by_purpose": {
+            "items": {
+              "$ref": "#/components/schemas/PurposeCalls"
+            },
+            "type": "array",
+            "title": "Calls By Purpose"
+          },
+          "cost_by_provider": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderCost"
+            },
+            "type": "array",
+            "title": "Cost By Provider"
+          },
+          "removed_documents": {
+            "items": {
+              "$ref": "#/components/schemas/RemovedDocument"
+            },
+            "type": "array",
+            "title": "Removed Documents"
+          },
+          "unextracted_document_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unextracted Document Ids"
+          },
+          "fallback_reasons_by_source": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Reasons By Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run",
+          "elapsed_seconds",
+          "requests_sent",
+          "fetches_by_outcome",
+          "snapshots_written",
+          "files_processed",
+          "files_failed",
+          "files_parsing",
+          "documents_new",
+          "documents_changed",
+          "records",
+          "paid_calls",
+          "estimated_cost",
+          "reported_cost",
+          "calls_by_purpose",
+          "cost_by_provider",
+          "removed_documents",
+          "unextracted_document_ids",
+          "fallback_reasons_by_source"
+        ],
+        "title": "RunReport",
+        "description": "A run's numbers, each a query over the logs. `elapsed_seconds` is null until the run has\nfinished. `records`, `unextracted_document_ids` and `fallback_reasons_by_source` are null\nwhile extraction (023) does not exist."
       },
       "RunSettings": {
         "properties": {

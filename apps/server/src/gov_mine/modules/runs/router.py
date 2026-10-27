@@ -4,7 +4,7 @@ from fastapi import APIRouter, status
 
 from gov_mine.dependencies import SessionDep
 from gov_mine.modules.runs import service
-from gov_mine.modules.runs.schemas import FetchOutput, RunCreate, RunOutput
+from gov_mine.modules.runs.schemas import FetchOutput, RunCreate, RunOutput, RunReport
 from gov_mine.shared.pagination import Limit, Offset, Page
 
 router = APIRouter(prefix="/runs", tags=["runs"])
@@ -31,6 +31,13 @@ async def create_run(data: RunCreate, session: SessionDep) -> RunOutput:
 @router.get("/{run_id}")
 async def read_run(run_id: uuid.UUID, session: SessionDep) -> RunOutput:
     return await service.read_run(session, run_id)
+
+
+@router.get("/{run_id}/report")
+async def read_report(run_id: uuid.UUID, session: SessionDep) -> RunReport:
+    """The run's numbers, each a query over its logs. Costs come from `ai_calls`: estimated from
+    the price list, and as reported by OpenRouter."""
+    return await service.report(session, run_id)
 
 
 @router.get("/{run_id}/fetches")

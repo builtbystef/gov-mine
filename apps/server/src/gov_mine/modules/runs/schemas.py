@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from gov_mine.modules.crawl.models import FetchOutcome, RunStatus
+from gov_mine.modules.ledger.models import AIPurpose
 
 RunTrigger = Literal["cli", "dashboard", "scheduled"]
 RunMode = Literal["full", "incremental"]
@@ -82,3 +83,76 @@ class FetchOutput(BaseModel):
     http_status: int | None
     reason: str | None
     snapshot: SnapshotSummary | None
+
+
+class OutcomeCount(BaseModel):
+    """The run's `fetches` rows with one outcome; `requests` are those that sent a request."""
+
+    outcome: FetchOutcome
+    fetches: int
+    requests: int
+
+
+class PurposeCalls(BaseModel):
+    """Paid calls for one purpose. `estimated_cost` is USD from the price list; `reported_cost`
+    is what OpenRouter said it charged, summed over the calls it reported a cost for."""
+
+    purpose: AIPurpose
+    calls: int
+    input_tokens: int
+    output_tokens: int
+    estimated_cost: Decimal
+    reported_cost: Decimal | None
+
+
+class ProviderCost(BaseModel):
+    """Like `PurposeCalls`, per provider. `calls_without_reported_cost` are left out of
+    `reported_cost`."""
+
+    provider: str
+    calls: int
+    estimated_cost: Decimal
+    reported_cost: Decimal | None
+    calls_without_reported_cost: int
+
+
+class RemovedDocument(BaseModel):
+    """A document whose webpage first returned 404 in the run."""
+
+    document_id: uuid.UUID
+    url: str
+    title: str | None
+    missing_since: datetime
+
+
+class RecordCounts(BaseModel):
+    created: int
+    amended: int
+
+
+class RunReport(BaseModel):
+    """A run's numbers, each a query over the logs. `elapsed_seconds` is null until the run has
+    finished. `records`, `unextracted_document_ids` and `fallback_reasons_by_source` are null
+    while extraction (023) does not exist."""
+
+    run: RunOutput
+    elapsed_seconds: float | None
+    requests_sent: int
+    fetches_by_outcome: list[OutcomeCount]
+    snapshots_written: int
+    # Snapshots written in the run whose parsing has ended, and of those, the failed ones.
+    files_processed: int
+    files_failed: int
+    files_parsing: int
+    documents_new: int
+    documents_changed: int
+    records: RecordCounts | None
+    paid_calls: int
+    estimated_cost: Decimal
+    reported_cost: Decimal | None
+    calls_by_purpose: list[PurposeCalls]
+    cost_by_provider: list[ProviderCost]
+    removed_documents: list[RemovedDocument]
+    unextracted_document_ids: list[uuid.UUID] | None
+    # Source id to `fallback_reason` to extractions.
+    fallback_reasons_by_source: dict[str, dict[str, int]] | None
