@@ -8,12 +8,13 @@ import {
   RefreshCwIcon,
   type LucideIcon,
 } from "lucide-react";
+import type { Route } from "next";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 
-const nav: { href: string; label: string; icon: LucideIcon }[] = [
+const nav: { href: Route; label: string; icon: LucideIcon }[] = [
   { href: "/", label: "Overview", icon: LayoutDashboardIcon },
   { href: "/institutions", label: "Institutions", icon: Building2Icon },
   { href: "/runs", label: "Runs", icon: RefreshCwIcon },
