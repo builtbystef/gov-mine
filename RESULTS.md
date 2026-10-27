@@ -58,18 +58,21 @@ a site that hasn't changed.
 |                                     |           Run 1 (first) | Run 2 (unchanged repeat) |
 | ----------------------------------- | ----------------------: | -----------------------: |
 | Run id                              |         `01a17e27-f477` |          `01a17e3a-1526` |
-| Time taken                          |             19 min 40 s |                   R2TIME |
-| Requests sent                       |                     729 |                    R2REQ |
-| Snapshots written (new bytes)       |           716 (1.15 GB) |                   R2SNAP |
-| Files processed                     | 716 (472 PDF, 244 HTML) |                  R2FILES |
-| Files failed                        |                       0 |                   R2FAIL |
-| Documents new / changed             |                 682 / 0 |                   R2DOCS |
-| Records created / amended           |                 721 / 0 |                    R2REC |
-| Paid calls                          |                   1,335 |                  R2CALLS |
-| Cost, reported by OpenRouter        |                   $0.49 |                   R2COST |
-| Cost, estimated from the price list |                   $0.45 |                    R2EST |
+| Time taken                          |             19 min 40 s |               8 min 28 s |
+| Requests sent                       |                     729 |                      729 |
+| Snapshots written (new bytes)       |           716 (1.15 GB) |                        0 |
+| Files processed                     | 716 (472 PDF, 244 HTML) |        0 (716 unchanged) |
+| Files failed                        |                       0 |                        0 |
+| Documents new / changed             |                 682 / 0 |                    0 / 0 |
+| Records created / amended           |                 721 / 0 |                    0 / 0 |
+| Paid calls                          |                   1,335 |                        0 |
+| Cost, reported by OpenRouter        |                   $0.49 |                       $0 |
+| Cost, estimated from the price list |                   $0.45 |                       $0 |
 
-R2TEXT
+Run 2 sent the same 729 requests and got the same bytes back for all 716 pages and files, so
+it wrote nothing and called no model. It took 43% of run 1's time: the requests, at one a
+second per host, are what is left. Conditional requests (ETag, postponed) would make most of
+them 304s.
 
 Why run 2 costs nothing: a page whose bytes are unchanged writes no snapshot, so
 it isn't parsed, classified or extracted again. A page whose bytes change but
@@ -136,9 +139,9 @@ Fallback reasons per source:
 
 | Number                              | Value                                                           |
 | ----------------------------------- | --------------------------------------------------------------- |
-| Run                                 | 01a17e06-2748-730d-879a-83363923ad39 (CreateTO, full, finished) |
-| Time taken                          | 463.2 s                                                         |
-| Requests sent                       | 722                                                             |
+| Run                                 | 01a17e3a-1526-7686-9c72-f5eecbed9e3d (CreateTO, full, finished) |
+| Time taken                          | 507.6 s                                                         |
+| Requests sent                       | 729                                                             |
 | Snapshots written                   | 0                                                               |
 | Files processed                     | 0                                                               |
 | Files failed                        | 0                                                               |
@@ -156,8 +159,8 @@ Fallback reasons per source:
 | -------------- | ------: | ------------: |
 | blocked_robots |       3 |             0 |
 | failed_http    |      13 |            13 |
-| skipped_scope  |    6597 |             0 |
-| unchanged      |     709 |           709 |
+| skipped_scope  |    6630 |             0 |
+| unchanged      |     716 |           716 |
 
 | Paid calls by purpose | Calls | Input tokens | Output tokens | Estimated (price list) | Reported (OpenRouter) |
 | --------------------- | ----: | -----------: | ------------: | ---------------------: | --------------------: |
@@ -219,22 +222,22 @@ uv run gov-mine run create <id> --full --replay http://127.0.0.1:8765   # change
 uv run gov-mine run create <id> --full --replay http://127.0.0.1:8765   # unchanged
 ```
 
-| Variant                      | Run id          | What happened                                                                                  | Snapshots | Records amended | Files failed | Paid calls |    Cost |
-| ---------------------------- | --------------- | ---------------------------------------------------------------------------------------------- | --------: | --------------: | -----------: | ---------: | ------: |
-| Baseline (as saved)          | `01a17e0d-48b7` | 18 requests. 17 copies matched run 2's bytes; Dunn House, a redirect on the live site, was new |         1 |   0 (1 created) |            0 |          2 | $0.0011 |
-| Changed source + failed file | `01a17e12-aef8` | Dunn House's phase moved on; one Parkdale Hub PDF served corrupt, kept with its parse error    |         2 |               1 |            1 |          1 | $0.0008 |
-| Unchanged                    | `01a17e13-5147` | Same 18 requests, same bytes                                                                   |         0 |               0 |            0 |          0 |      $0 |
+| Variant                      | Run id          | What happened                                                                                                                   | Snapshots | Records amended | Files failed | Paid calls |    Cost |
+| ---------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------: | --------------: | -----------: | ---------: | ------: |
+| Baseline (as saved)          | `01a17e41-ebd5` | 18 requests. 17 copies matched run 2's bytes; Dunn House, served at its old URL (live, it redirects to `/springhouse`), was new |         1 |   0 (1 created) |            0 |          2 | $0.0011 |
+| Changed source + failed file | `01a17e42-a094` | Dunn House's phase moved on; one Parkdale Hub PDF served corrupt, kept with its parse error                                     |         2 |               1 |            1 |          1 | $0.0008 |
+| Unchanged                    | `01a17e43-4524` | Same 18 requests, same bytes                                                                                                    |         0 |               0 |            0 |          0 |      $0 |
 
 Each replay run took 38 s. The URLs the replay server does not hold (788 links) are logged as
 `skipped_scope` `not_in_replay`, without a request.
 
-The amended record's history, from `record_snapshots` (and `/records/01a17e0d-c48a-7750-8ee3-c07f4302e1dd`
+The amended record's history, from `record_snapshots` (and `/records/01a17e42-6539-7775-aa93-18caf8921f18`
 in the dashboard):
 
 | `created_at` (UTC)  | name         | phase                     |
 | ------------------- | ------------ | ------------------------- |
-| 2026-10-27 15:49:53 | Spring House | Pre-construction          |
-| 2026-10-27 15:55:47 | Spring House | Delivery and Construction |
+| 2026-10-27 16:47:23 | Spring House | Pre-construction          |
+| 2026-10-27 16:48:06 | Spring House | Delivery and Construction |
 
 The corrupt PDF (`backgroundfile-101969.pdf`, 51 bytes served) got a new snapshot with
 `text_status = failed` and PDFium's message in `text_error`. Its bytes are kept, it is not
