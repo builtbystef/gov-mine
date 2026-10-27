@@ -8,6 +8,7 @@ import hashlib
 import itertools
 import json
 import logging
+import os
 import re
 import time
 import uuid
@@ -54,7 +55,7 @@ SERVER_ROOT = Path(__file__).resolve().parents[4]
 CREATETO = SERVER_ROOT / "fixtures" / "createto"
 HOMEPAGE = (CREATETO / "homepage.html").read_bytes()
 SITEMAP = "https://createto.ca/sitemap.xml"
-DATABASE = "gov_mine_test_crawl"
+DATABASE = "gov_mine_test_crawl" + os.environ.get("TEST_DATABASE_SUFFIX", "")
 # The run must be finished well within this; it takes a few seconds.
 DEADLINE_SECONDS = 30
 

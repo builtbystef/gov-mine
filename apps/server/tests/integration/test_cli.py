@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 REPO_ROOT = Path(__file__).parents[4]
 # The worker runs on a database of its own: its queue is committed, not rolled back.
-WORKER_DATABASE = "gov_mine_test_worker"
+WORKER_DATABASE = "gov_mine_test_worker" + os.environ.get("TEST_DATABASE_SUFFIX", "")
 # A worker the test expects to stop on its own is sent SIGTERM after this long.
 WATCHDOG_SECONDS = 30
 # Jobs at the cap wait this long for one more to start, which none should.

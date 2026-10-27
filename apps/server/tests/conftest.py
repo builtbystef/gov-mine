@@ -2,6 +2,7 @@
 configured server (environment or `.env`) is read once, and the tests get a copy
 pointed at the test database."""
 
+import os
 from typing import TYPE_CHECKING
 
 import pytest
@@ -13,7 +14,9 @@ from gov_mine.config import Settings
 if TYPE_CHECKING:
     from sqlalchemy.engine import URL
 
-TEST_DATABASE = "gov_mine_test"
+# TEST_DATABASE_SUFFIX names the test databases apart, so test runs in two worktrees at once
+# do not drop each other's.
+TEST_DATABASE = "gov_mine_test" + os.environ.get("TEST_DATABASE_SUFFIX", "")
 
 # The development server, as configured.
 _configured = Settings()
