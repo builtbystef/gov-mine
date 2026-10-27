@@ -391,6 +391,8 @@ class Download:
     body: bytes = b""
     media_type: str = DEFAULT_MEDIA_TYPE
     encoding: str = "utf-8"
+    # Where a 3xx pointed, normalised.
+    redirect: str | None = None
 
 
 async def download(
@@ -408,7 +410,11 @@ async def download(
             got.media_type = media_type_of(response)
             got.encoding = response.encoding or got.encoding
             if response.status_code != httpx.codes.OK:
+                location = response.headers.get("location") if response.is_redirect else None
                 got.dropped = FetchOutcome.FAILED_HTTP, None
+                if location:
+                    got.redirect = normalise_url(urljoin(url, location))
+                    got.dropped = FetchOutcome.FAILED_HTTP, f"redirect {got.redirect}"
                 return got
             got.dropped = response_refusal(url, response, max_bytes)
             if got.dropped is None:
@@ -580,6 +586,7 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
             depth=depth,
             max_bytes=max_bytes,
             follow=follow,
+            last_request=last_request,
             replay=replay,
         )
         if not _transient(fetch):
@@ -610,10 +617,13 @@ async def _send(  # noqa: PLR0913 - one try of fetch_page, with what it works wi
     depth: int,
     max_bytes: int,
     follow: bool,
+    last_request: bool,
     replay: str | None,
 ) -> None:
     """One try at `webpage`, once its host's delay has passed, logged in `fetch`: what it kept,
-    and, when `follow`, the links of an HTML page queued one link deeper."""
+    and, when `follow`, the links of an HTML page queued one link deeper. A redirect is
+    `failed_http` with its target in the reason, and the target is queued one link deeper,
+    unless this is the run's `last_request`."""
     fetch.requested_at = await wait_for_host(session, webpage.domain_id)
     started = time.perf_counter()
     got = await download(http, webpage.url, max_bytes, replay=replay)
@@ -625,6 +635,10 @@ async def _send(  # noqa: PLR0913 - one try of fetch_page, with what it works wi
         webpage.missing_since = None
     if got.dropped is not None:
         fetch.outcome, fetch.reason = got.dropped
+        if got.redirect is not None and not last_request:
+            # The target is queued like a link found on the page, one link deeper, so the
+            # fence and the run's dedup apply to it as to any link.
+            await queue_links(session, fetch.crawl_run_id, webpage, [got.redirect], depth + 1)
     else:
         fetch.snapshot_id = await ingest.store(
             session, store, webpage.id, got.body, got.media_type, run_id=fetch.crawl_run_id

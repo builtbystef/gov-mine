@@ -713,6 +713,37 @@ def test_a_link_the_fence_refuses_is_queued_without_its_hosts_lock(
     }
 
 
+def test_a_redirect_is_logged_and_its_target_crawled_once(
+    crawl_settings: Settings, database: Engine
+):
+    run_id = create_run()
+    website = Website(
+        {
+            f"{SITE}/": page("/projects/dunn-house-phase-2", "/old-news", "/news"),
+            f"{SITE}/springhouse": page("/report.pdf"),
+            f"{SITE}/news": page(),
+            f"{SITE}/report.pdf": b"%PDF-1.4",
+        },
+        responses={
+            f"{SITE}/projects/dunn-house-phase-2": lambda: httpx.Response(
+                308, headers={"location": "/springhouse"}
+            ),
+            # Its target is also linked from the homepage, so it is fetched once.
+            f"{SITE}/old-news": lambda: httpx.Response(307, headers={"location": f"{SITE}/news"}),
+        },
+    )
+    asyncio.run(crawl(crawl_settings, run_id, website))
+
+    fetches = fetches_by_url(database, run_id)
+    moved = fetches[f"{SITE}/projects/dunn-house-phase-2"]
+    assert (moved["outcome"], moved["http_status"]) == ("failed_http", 308)
+    assert moved["reason"] == f"redirect {SITE}/springhouse"
+    # The target is crawled like a link found on the redirecting page, its own links too.
+    for url in (f"{SITE}/springhouse", f"{SITE}/report.pdf", f"{SITE}/news"):
+        assert fetches[url]["outcome"] == "fetched"
+    assert website.page_requests.count(f"{SITE}/news") == 1
+
+
 def test_a_sitemap_url_also_found_as_a_link_is_fetched_once(
     crawl_settings: Settings, database: Engine
 ):
