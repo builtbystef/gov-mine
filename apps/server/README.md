@@ -12,6 +12,7 @@ apps/server/
 ├── src/gov_mine/
 │   ├── asgi.py           # entry point for `fastapi run`/`fastapi dev`
 │   ├── main.py           # create_app(settings): the API and its lifespan
+│   ├── cli.py            # `gov-mine`, the command line
 │   ├── config.py         # Settings; every GOV_MINE_* variable is documented in .env.example
 │   ├── resources.py      # what every process opens once: database, store, queue
 │   ├── modules/          # one package per feature: health (the rest per docs/specification/06-architecture.md)
@@ -31,7 +32,7 @@ apps/server/
 - **One place for the work.** A module's `service.py` does the work and raises `AppError`s. Routes, the CLI, and the worker's jobs all call the same service functions; none holds logic of its own.
 - **No repository layer.** Services take the session; the session is the unit of work.
 - **Narrow imports between modules.** A module imports another only through its `service`, `models`, `schemas`, and `dependencies`. Helpers with no feature of their own go in `shared/`.
-- **The environment is read at the entry points.** Only `asgi.py` and `jobs/worker.py` read it. Everything else, tests included, receives a `Settings`.
+- **The environment is read at the entry points.** Only `asgi.py` and `cli.py` read it. Everything else, tests included, receives a `Settings`.
 - **Jobs commit with their data.** A job is queued on the handler's session, so it commits or rolls back with the rows it is about.
 - **Tests never call the model.** The test settings drop the OpenAI key.
 

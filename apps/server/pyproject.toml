@@ -35,7 +35,7 @@ dependencies = [
 dev = ["httpx2>=2.12,<3", "types-aiobotocore-s3>=3.9,<4"]
 
 [project.scripts]
-gov-mine-worker = "gov_mine.jobs.worker:main"
+gov-mine = "gov_mine.cli:app"
 
 [tool.fastapi]
 # The ASGI app, built from the environment. Everything else gets its settings as

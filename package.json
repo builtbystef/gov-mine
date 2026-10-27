@@ -20,7 +20,7 @@
     "db:migrate": "cd apps/server && uv run alembic upgrade head",
     "dev": "concurrently --kill-others-on-fail --prefix-colors \"cyan,magenta,green\" --names api,worker,web \"pnpm run dev:api\" \"pnpm run dev:worker\" \"pnpm --filter @gov-mine/web run dev\"",
     "dev:api": "cd apps/server && uv run fastapi dev",
-    "dev:worker": "cd apps/server && uv run watchfiles --target-type command gov-mine-worker src",
+    "dev:worker": "cd apps/server && uv run watchfiles --target-type command 'gov-mine worker' src",
     "dev:web": "cd apps/web && vp run dev",
     "ci": "vp run check && vp run check:generated && vp run test && vp run -r build"
   },

@@ -1,7 +1,5 @@
-"""`gov-mine-worker`: the process that runs queued jobs. The one place, with asgi.py,
-that reads the environment."""
+"""The process that runs queued jobs."""
 
-import asyncio
 import logging
 
 from gov_mine.config import Settings
@@ -11,7 +9,7 @@ from gov_mine.shared import logs, telemetry
 logger = logging.getLogger(__name__)
 
 
-async def run(settings: Settings) -> None:
+async def run(settings: Settings, concurrency: int) -> None:
     logs.configure(settings.log_level, settings.log_format)
     if (log_handler := telemetry.configure(settings, service_name="gov-mine-worker")) is not None:
         logging.getLogger().addHandler(log_handler)
@@ -19,14 +17,6 @@ async def run(settings: Settings) -> None:
         jobs = resources.jobs
         logger.info("Worker ready: %d tasks registered", len(jobs.tasks))
         await jobs.run_worker_async(
-            concurrency=settings.jobs_concurrency,
+            concurrency=concurrency,
             additional_context=worker_context(resources),
         )
-
-
-def main() -> None:
-    asyncio.run(run(Settings()))
-
-
-if __name__ == "__main__":
-    main()

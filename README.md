@@ -60,7 +60,7 @@ One image per app, one command per process, settings from environment variables:
 | Process  | Image         | Command                                   | Port |
 | -------- | ------------- | ----------------------------------------- | ---- |
 | `api`    | `apps/server` | `fastapi run --port 8000 --proxy-headers` | 8000 |
-| `worker` | `apps/server` | `gov-mine-worker`                         | none |
+| `worker` | `apps/server` | `gov-mine worker`                         | none |
 | `web`    | `apps/web`    | `node apps/web/server.js`                 | 3000 |
 
 Plus managed PostgreSQL and an S3-compatible bucket. Only `web` needs a

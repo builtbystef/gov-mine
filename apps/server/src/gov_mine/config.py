@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Read from `GOV_MINE_*` environment variables and `.env`. `.env.example` documents
     every field.
 
-    Built once per process by its entry point (asgi.py, the worker, a script) and
+    Built once per process by its entry point (asgi.py, the CLI, a script) and
     passed on from there; nothing reads the environment at import time. Tests build
     their own."""
 
