@@ -20,7 +20,7 @@
     "class-variance-authority": "catalog:",
     "cn": "catalog:",
     "lucide-react": "catalog:",
-    "next": "^16.4.2",
+    "next": "^16.4.3",
     "next-themes": "catalog:",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
