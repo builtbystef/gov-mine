@@ -3,7 +3,7 @@ from datetime import timedelta
 from pydantic import Field, HttpUrl, PostgresDsn, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from gov_mine.integrations.ai import AIProvider, ReasoningEffort
+from gov_mine.integrations.ai import ReasoningEffort
 from gov_mine.integrations.storage import StorageProvider
 from gov_mine.shared.logs import LogFormat
 
@@ -56,12 +56,12 @@ class Settings(BaseSettings):
     jobs_concurrency: int = Field(2, ge=1)
 
     # --- AI ---
-    # "openai" addresses the model through the Responses API.
-    ai_provider: AIProvider = "openai"
-    # None: nothing calls the model.
-    openai_api_key: SecretStr | None = None
-    ai_model: str = "gpt-5.6-luna"
-    ai_reasoning_effort: ReasoningEffort = "low"
+    # Every model goes through OpenRouter with this key. None: nothing calls a model.
+    openrouter_api_key: SecretStr | None = None
+    # OpenRouter model ids. Each must be in the ledger's price list.
+    extract_model: str = "openai/gpt-6-luna"
+    classify_model: str = "typesafe/jev-1.14"
+    extract_reasoning_effort: ReasoningEffort = "medium"
 
     # env_ignore_empty: hosting platforms often pass an unset variable as "",
     # which must read as the default (None for the Logfire token), not as "".

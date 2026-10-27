@@ -39,14 +39,14 @@ def test_database_name() -> str:
 
 @pytest.fixture
 def settings() -> Settings:
-    """The configured settings, on the test database. No OpenAI key, whatever a
+    """The configured settings, on the test database. No OpenRouter key, whatever a
     local `.env` says: tests never call the model. A module or class that needs
     other values overrides this fixture, requesting it as the base."""
     return _configured.model_copy(
         update={
             "database_url": PostgresDsn(_test_url),
             "app_name": "Test API",
-            "openai_api_key": None,
+            "openrouter_api_key": None,
         }
     )
 
