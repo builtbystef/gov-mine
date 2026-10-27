@@ -1,6 +1,7 @@
 """URLs as the crawl keys them: one normalised form per page, and the links a page holds."""
 
 import html as html_entities
+import posixpath
 import re
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
@@ -10,6 +11,17 @@ DEFAULT_PORTS = {"http": 80, "https": 443}
 # Query parameters that say how a visitor arrived, not what the page is. Any `utm_*` too.
 TRACKING_PARAMETERS = frozenset(
     {"fbclid", "gclid", "dclid", "msclkid", "yclid", "igshid", "mc_cid", "mc_eid", "_ga", "_gl"}
+)
+
+# The extensions of the files the crawler downloads: PDF, office files, csv, txt and images.
+# A URL ending in one looks like a file, which is all a `files_only` host may serve.
+FILE_EXTENSIONS = frozenset(
+    {
+        "pdf",
+        *("doc", "docx", "xls", "xlsx", "ppt", "pptx"),
+        *("csv", "txt"),
+        *("avif", "bmp", "gif", "jpeg", "jpg", "png", "svg", "tif", "tiff", "webp"),
+    }
 )
 
 # An absolute http(s) URL in running text: up to the first character a URL cannot hold.
@@ -60,6 +72,16 @@ def is_within(url: str, prefix: str) -> bool:
     return target.path == scope.path or target.path.startswith(f"{base}/")
 
 
+def extension_of(url: str) -> str:
+    """The lower-cased extension of the URL path's last segment, without its dot; "" if none."""
+    return posixpath.splitext(urlsplit(url).path)[1].removeprefix(".").lower()
+
+
+def looks_like_file(url: str) -> bool:
+    """Whether `url` names a file the crawler downloads, judged from its extension alone."""
+    return extension_of(url) in FILE_EXTENSIONS
+
+
 def find_links(html: str, page_url: str) -> list[str]:
     """Every http(s) URL an HTML page holds, normalised, each once, in the order found: the
     `<a href>` targets resolved against the page (or its `<base href>`), then every absolute URL
@@ -95,4 +117,13 @@ def _join(base: str, href: str) -> str | None:
         return None
 
 
-__all__ = ["DEFAULT_PORTS", "TRACKING_PARAMETERS", "find_links", "is_within", "normalise_url"]
+__all__ = [
+    "DEFAULT_PORTS",
+    "FILE_EXTENSIONS",
+    "TRACKING_PARAMETERS",
+    "extension_of",
+    "find_links",
+    "is_within",
+    "looks_like_file",
+    "normalise_url",
+]

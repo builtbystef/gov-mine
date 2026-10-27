@@ -9,11 +9,11 @@ Links to hosts other than the institution's own are handled by each host's `craw
 
 ## Acceptance criteria
 
-- [ ] A link to a host never seen before creates a `domains` row with policy `files_only`.
-- [ ] On a `files_only` host, a link that looks like a file (for example `https://a-us.storyblok.com/f/…/report.pdf`) is fetched, and a link that looks like a page is `skipped_scope`.
-- [ ] Links found inside a file fetched from a `files_only` host are not enqueued.
-- [ ] Every link to a `blocked` host gets a `skipped_scope` fetch and no request.
-- [ ] Changing a host's policy from `files_only` to `crawl` makes the next run follow its in-scope links.
+- [x] A link to a host never seen before creates a `domains` row with policy `files_only`.
+- [x] On a `files_only` host, a link that looks like a file (for example `https://a-us.storyblok.com/f/…/report.pdf`) is fetched, and a link that looks like a page is `skipped_scope`.
+- [x] Links found inside a file fetched from a `files_only` host are not enqueued.
+- [x] Every link to a `blocked` host gets a `skipped_scope` fetch and no request.
+- [x] Changing a host's policy from `files_only` to `crawl` makes the next run follow its in-scope links.
 
 ## Out of scope
 

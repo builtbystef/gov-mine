@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from gov_mine.shared.urls import find_links, is_within, normalise_url
+from gov_mine.shared.urls import find_links, is_within, looks_like_file, normalise_url
 
 PROJECTS = Path(__file__).resolve().parents[3] / "fixtures" / "createto" / "projects"
 
@@ -75,3 +75,32 @@ def test_every_pdf_in_the_parkdale_hub_page_body_is_found():
     assert len(files) == 14
     assert len([file for file in files if not file["in_rendered_html"]]) == 8
     assert {normalise_url(file["url"]) for file in files} <= links
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://a-us.storyblok.com/f/1017201/x/0a1b2c3d4e/report.pdf",
+        "https://a-us.storyblok.com/f/1017201/1200x627/d41395f46b/annual-report-3-4.png",
+        "https://example.com/Minutes.DOCX",
+        "https://example.com/data/table.csv?download=1",
+    ],
+)
+def test_a_url_with_a_file_extension_looks_like_a_file(url: str):
+    assert looks_like_file(url)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://a-us.storyblok.com/about",
+        "https://example.com/",
+        "https://example.com/page.html",
+        "https://example.com/report.pdf/view",
+        "https://example.com/v1.2/notes",
+        "https://example.com/?file=report.pdf",
+        "https://a-us.storyblok.com/f/1017201/x/b500f5503f/createto_web_v2_h264.mp4",
+    ],
+)
+def test_a_url_without_a_file_extension_does_not(url: str):
+    assert not looks_like_file(url)

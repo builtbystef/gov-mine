@@ -31,7 +31,7 @@ from gov_mine.modules.ingest import service as ingest
 from gov_mine.modules.institutions.models import Institution
 from gov_mine.shared.exceptions import NotFoundError
 from gov_mine.shared.sitemaps import parse_sitemap
-from gov_mine.shared.urls import find_links, is_within, normalise_url
+from gov_mine.shared.urls import find_links, is_within, looks_like_file, normalise_url
 
 logger = logging.getLogger(__name__)
 
@@ -192,13 +192,22 @@ def _normalised(url: str) -> str | None:
         return None
 
 
-def refusal(url: str, website_url: str, depth: int) -> tuple[FetchOutcome, str] | None:
-    """Why the fence turns `url` down at `depth`, as an outcome and a reason, or None. Only the
-    institution's website prefix is in scope until host policies exist."""
+def refusal(
+    url: str, policy: CrawlPolicy, website_url: str, depth: int
+) -> tuple[FetchOutcome, str] | None:
+    """Why the fence turns `url`, on a host with `policy`, down at `depth`, as an outcome and a
+    reason, or None. A `blocked` host is never fetched, and a `files_only` host only for what
+    looks like a file. The institution's website prefix bounds its own host; any other `crawl`
+    host is in scope whole."""
+    if policy is CrawlPolicy.BLOCKED:
+        return FetchOutcome.SKIPPED_SCOPE, "blocked_host"
+    if policy is CrawlPolicy.PLATFORM:
+        # No platform rule exists yet to say which of its URLs to follow.
+        return FetchOutcome.SKIPPED_SCOPE, "platform_host"
+    if policy is CrawlPolicy.FILES_ONLY and not looks_like_file(url):
+        return FetchOutcome.SKIPPED_SCOPE, "not_a_file"
     prefix = normalise_url(website_url)
-    if host_of(url) != host_of(prefix):
-        return FetchOutcome.SKIPPED_SCOPE, "other_host"
-    if not is_within(url, prefix):
+    if host_of(url) == host_of(prefix) and not is_within(url, prefix):
         return FetchOutcome.SKIPPED_SCOPE, "outside_prefix"
     if depth > MAX_DEPTH:
         return FetchOutcome.SKIPPED_DEPTH, f"depth {depth} > {MAX_DEPTH}"
@@ -219,7 +228,8 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
     Once the run has sent its `--limit` requests, nothing happens and None is returned. A URL
     the fence refuses gets its row and no request. Otherwise a 200 hands the body to
     `ingest.store`: `fetched` with the new snapshot, or `unchanged` when the bytes are the ones
-    already kept; an HTML page's links are then queued one link deeper. Any other status is
+    already kept; an HTML page on a `crawl` host then queues its links one link deeper (what a
+    `files_only` host serves is never followed, whatever its type). Any other status is
     `failed_http`, and a timeout `failed_timeout`."""
     run = await get_run(session, run_id)
     limit = run.settings.get("limit")
@@ -231,8 +241,9 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
             return None
     institution = await session.get_one(Institution, run.institution_id)
     webpage = await session.get_one(Webpage, webpage_id)
+    domain = await session.get_one(Domain, webpage.domain_id)
     fetch = Fetch(crawl_run_id=run.id, webpage_id=webpage.id, requested_at=utcnow())
-    refused = refusal(webpage.url, institution.website_url, depth)
+    refused = refusal(webpage.url, domain.crawl_policy, institution.website_url, depth)
     if refused is not None:
         fetch.outcome, fetch.reason = refused
         session.add(fetch)
@@ -255,7 +266,10 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
             fetch.outcome = (
                 FetchOutcome.FETCHED if fetch.snapshot_id is not None else FetchOutcome.UNCHANGED
             )
-            if media_type_of(response) in HTML_MEDIA_TYPES:
+            if (
+                domain.crawl_policy is CrawlPolicy.CRAWL
+                and media_type_of(response) in HTML_MEDIA_TYPES
+            ):
                 links = find_links(response.text, webpage.url)
                 await queue_links(session, run.id, webpage, links, depth + 1)
         else:

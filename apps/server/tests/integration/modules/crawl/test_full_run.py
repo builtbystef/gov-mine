@@ -94,11 +94,15 @@ def rows(engine: Engine, sql: str, **params: Any) -> list[dict[str, Any]]:
 
 
 class Website:
-    """Serves `pages` (URL to body; a `.pdf` as a PDF, an `.xml` as XML, the rest as HTML) and
-    404 for the rest, and notes the run's status as each request arrives."""
+    """Serves `pages` (URL to body; a `.pdf` as a PDF, an `.xml` as XML, the rest as HTML,
+    unless `media_types` says otherwise) and 404 for the rest, and notes the run's status as
+    each request arrives."""
 
-    def __init__(self, pages: dict[str, bytes] | None = None) -> None:
+    def __init__(
+        self, pages: dict[str, bytes] | None = None, media_types: dict[str, str] | None = None
+    ) -> None:
         self.pages = pages if pages is not None else {"https://createto.ca/": HOMEPAGE}
+        self.media_types = media_types or {}
         self.requests: list[str] = []
         self.status_during_fetch: list[str] = []
         self.session_factory: Any = None
@@ -111,9 +115,10 @@ class Website:
             self.status_during_fetch.extend(statuses)
         if url not in self.pages:
             return httpx.Response(404)
-        media_type = {".pdf": "application/pdf", ".xml": "application/xml"}.get(
-            url[url.rfind(".") :], "text/html; charset=utf-8"
-        )
+        media_type = self.media_types.get(url) or {
+            ".pdf": "application/pdf",
+            ".xml": "application/xml",
+        }.get(url[url.rfind(".") :], "text/html; charset=utf-8")
         return httpx.Response(200, content=self.pages[url], headers={"Content-Type": media_type})
 
     @property
@@ -375,8 +380,10 @@ def test_a_full_run_follows_links_within_the_site_once_each(
                 script='{"filename":"https:\\/\\/createto.ca\\/files\\/report.pdf"}',
             ),
             f"{SITE}/projects": page("/", "/about", "/projects/a?utm_source=nav"),
-            f"{SITE}/about": page("/projects", "https://createto.ca:443/projects/a"),
-            f"{SITE}/projects/a": page(),
+            # /about and /projects are fetched concurrently: only /projects links /projects/a,
+            # so the page it is found on does not depend on which finishes first.
+            f"{SITE}/about": page("/projects", "https://createto.ca:443/projects"),
+            f"{SITE}/projects/a": page("https://createto.ca:443/projects/a", "/about"),
             f"{SITE}/files/report.pdf": b"%PDF-1.4",
         }
     )
@@ -405,11 +412,11 @@ def test_a_full_run_follows_links_within_the_site_once_each(
         "https://elsewhere.example/page": ids[f"{SITE}/"],
         f"{SITE}/projects/a": ids[f"{SITE}/projects"],
     }
-    # The other host's link is logged as refused, with no request.
+    # The other host's page is logged as refused, with no request.
     fetches = fetches_by_url(database, run_id)
     assert set(fetches) == set(ids)
     elsewhere = fetches.pop("https://elsewhere.example/page")
-    assert (elsewhere["outcome"], elsewhere["reason"]) == ("skipped_scope", "other_host")
+    assert (elsewhere["outcome"], elsewhere["reason"]) == ("skipped_scope", "not_a_file")
     assert (elsewhere["duration_ms"], elsewhere["http_status"]) == (None, None)
     assert {fetch["outcome"] for fetch in fetches.values()} == {"fetched"}
     (domain,) = rows(database, "SELECT crawl_policy FROM domains WHERE name = 'elsewhere.example'")
@@ -470,7 +477,7 @@ def test_urls_outside_the_website_prefix_are_not_requested(
         f"{SITE}/projects-archive": ("skipped_scope", "outside_prefix", None),
         f"{SITE}/about": ("skipped_scope", "outside_prefix", None),
         "http://createto.ca/projects/b": ("skipped_scope", "outside_prefix", None),
-        "https://www.createto.ca/projects/c": ("skipped_scope", "other_host", None),
+        "https://www.createto.ca/projects/c": ("skipped_scope", "not_a_file", None),
     }
 
 
@@ -589,4 +596,141 @@ def test_a_sitemap_url_also_found_as_a_link_is_fetched_once(
         f"{SITE}/projects": None,
         f"{SITE}/about": None,
         f"{SITE}/projects/a": ids[f"{SITE}/projects"],
+    }
+
+
+STORYBLOK = "https://a-us.storyblok.com/f/1017201/x/0a1b2c3d4e"
+
+
+def test_a_files_only_host_serves_its_files_and_none_of_its_pages(
+    crawl_settings: Settings, database: Engine
+):
+    run_id = create_run()
+    website = Website(
+        {
+            f"{SITE}/": page(
+                f"{STORYBLOK}/report.pdf",
+                f"{STORYBLOK}/plan.PDF",
+                "https://a-us.storyblok.com/about",
+                "https://news.example/story",
+                script=f'{{"asset":"{STORYBLOK}/landing.pdf"}}',
+            ),
+            # A file holding links, and a "file" that turns out to be an HTML page.
+            f"{STORYBLOK}/report.pdf": b"%PDF-1.4 https://a-us.storyblok.com/f/1/x/2/other.pdf",
+            f"{STORYBLOK}/plan.PDF": b"%PDF-1.4",
+            f"{STORYBLOK}/landing.pdf": page(
+                "https://a-us.storyblok.com/f/1/x/3/linked.pdf", "https://news.example/linked.pdf"
+            ),
+        },
+        media_types={f"{STORYBLOK}/landing.pdf": "text/html"},
+    )
+
+    asyncio.run(crawl(crawl_settings, run_id, website))
+
+    (run,) = rows(database, "SELECT status FROM crawl_runs")
+    assert run["status"] == "finished"
+    # Hosts seen for the first time are files_only.
+    domains = {row["name"]: row["crawl_policy"] for row in rows(database, "SELECT * FROM domains")}
+    assert domains == {
+        "createto.ca": "crawl",
+        "a-us.storyblok.com": "files_only",
+        "news.example": "files_only",
+    }
+    # Their files are fetched; their pages are refused with no request.
+    assert sorted(website.page_requests) == sorted(
+        [f"{SITE}/", f"{STORYBLOK}/report.pdf", f"{STORYBLOK}/plan.PDF", f"{STORYBLOK}/landing.pdf"]
+    )
+    outcomes = {
+        url: (fetch["outcome"], fetch["reason"], fetch["duration_ms"] is not None)
+        for url, fetch in fetches_by_url(database, run_id).items()
+    }
+    assert outcomes == {
+        f"{SITE}/": ("fetched", None, True),
+        f"{STORYBLOK}/report.pdf": ("fetched", None, True),
+        f"{STORYBLOK}/plan.PDF": ("fetched", None, True),
+        f"{STORYBLOK}/landing.pdf": ("fetched", None, True),
+        "https://a-us.storyblok.com/about": ("skipped_scope", "not_a_file", False),
+        "https://news.example/story": ("skipped_scope", "not_a_file", False),
+    }
+    # Nothing found inside what the files_only host served was queued.
+    assert {row["url"] for row in rows(database, "SELECT url FROM webpages")} == set(outcomes)
+    assert rows(database, "SELECT * FROM procrastinate_jobs WHERE task_name = 'crawl.fetch'") == []
+
+
+def test_every_link_to_a_blocked_host_is_refused_without_a_request(
+    crawl_settings: Settings, database: Engine
+):
+    with database.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO domains (id, name, crawl_policy, crawl_delay_ms, created_at)"
+                " VALUES (gen_random_uuid(), 'tracker.example', 'blocked', 1000, now())"
+            )
+        )
+    run_id = create_run()
+    blocked = [
+        "https://tracker.example/",
+        "https://tracker.example/page",
+        "https://tracker.example/files/report.pdf",
+    ]
+    website = Website(
+        {
+            f"{SITE}/": page(*blocked, "/about"),
+            f"{SITE}/about": page("https://tracker.example/other.pdf"),
+            **dict.fromkeys(blocked, b"%PDF-1.4"),
+        }
+    )
+
+    asyncio.run(crawl(crawl_settings, run_id, website))
+
+    assert sorted(website.page_requests) == [f"{SITE}/", f"{SITE}/about"]
+    refused = {
+        url: (fetch["outcome"], fetch["reason"], fetch["duration_ms"], fetch["http_status"])
+        for url, fetch in fetches_by_url(database, run_id).items()
+        if fetch["outcome"] != "fetched"
+    }
+    assert refused == dict.fromkeys(
+        [*blocked, "https://tracker.example/other.pdf"],
+        ("skipped_scope", "blocked_host", None, None),
+    )
+    (domain,) = rows(database, "SELECT crawl_policy FROM domains WHERE name = 'tracker.example'")
+    assert domain["crawl_policy"] == "blocked"
+
+
+def test_a_host_changed_to_crawl_is_followed_on_the_next_run(
+    crawl_settings: Settings, database: Engine
+):
+    pages = {
+        f"{SITE}/": page("https://docs.example/guide", "https://docs.example/files/a.pdf"),
+        "https://docs.example/guide": page("/guide/part-2", "https://docs.example/files/b.pdf"),
+        "https://docs.example/guide/part-2": page(),
+        "https://docs.example/files/a.pdf": b"%PDF-1.4",
+        "https://docs.example/files/b.pdf": b"%PDF-1.4",
+    }
+    first_run = create_run()
+    first = Website(pages)
+    asyncio.run(crawl(crawl_settings, first_run, first))
+
+    assert sorted(first.page_requests) == [f"{SITE}/", "https://docs.example/files/a.pdf"]
+    guide = fetches_by_url(database, first_run)["https://docs.example/guide"]
+    assert (guide["outcome"], guide["reason"]) == ("skipped_scope", "not_a_file")
+
+    with database.begin() as connection:
+        connection.execute(
+            text("UPDATE domains SET crawl_policy = 'crawl' WHERE name = 'docs.example'")
+        )
+    second_run = create_run()
+    second = Website(pages)
+    asyncio.run(crawl(crawl_settings, second_run, second))
+
+    (run,) = rows(database, "SELECT status FROM crawl_runs WHERE id = :id", id=second_run)
+    assert run["status"] == "finished"
+    assert sorted(second.page_requests) == sorted(pages)
+    fetches = fetches_by_url(database, second_run)
+    assert {url: fetch["outcome"] for url, fetch in fetches.items()} == {
+        f"{SITE}/": "unchanged",
+        "https://docs.example/guide": "fetched",
+        "https://docs.example/guide/part-2": "fetched",
+        "https://docs.example/files/a.pdf": "unchanged",
+        "https://docs.example/files/b.pdf": "fetched",
     }
