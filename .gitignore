@@ -30,3 +30,6 @@ __pycache__/
 *.log
 .DS_Store
 .vitest/
+
+# Worktrees the agents work in
+.claude/worktrees/
