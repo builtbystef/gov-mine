@@ -157,8 +157,10 @@ export function FetchesTable({
     ),
   );
 
+  // At least a screen tall, so a search that matches few rows leaves the page
+  // long enough to stay where it is instead of the browser clamping it to the top.
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex min-h-svh flex-col gap-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <OutcomeFilter
           counts={outcomeCounts}
