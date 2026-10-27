@@ -522,7 +522,9 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
     if got.dropped is not None:
         fetch.outcome, fetch.reason = got.dropped
     else:
-        fetch.snapshot_id = await ingest.store(session, store, webpage.id, got.body, got.media_type)
+        fetch.snapshot_id = await ingest.store(
+            session, store, webpage.id, got.body, got.media_type, run_id=run.id
+        )
         fetch.outcome = (
             FetchOutcome.FETCHED if fetch.snapshot_id is not None else FetchOutcome.UNCHANGED
         )

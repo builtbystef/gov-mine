@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 TASK_MODULES = [
     "gov_mine.jobs.stalled",
     "gov_mine.modules.crawl.jobs",
+    "gov_mine.modules.ingest.jobs",
 ]
 
 # What every `@task` registers on. Import-time, settings-free.

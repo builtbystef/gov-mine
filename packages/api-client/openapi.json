@@ -238,6 +238,96 @@
         }
       }
     },
+    "/snapshots/{snapshot_id}/text/{page}": {
+      "get": {
+        "tags": [
+          "snapshots"
+        ],
+        "summary": "Read Text",
+        "description": "The markdown of one page of the snapshot, from 1. 409 while it is being parsed; 404 when\nit has no text.",
+        "operationId": "snapshots-read_text",
+        "parameters": [
+          {
+            "name": "snapshot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Snapshot Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Page"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/markdown": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/snapshots/{snapshot_id}/bytes": {
+      "get": {
+        "tags": [
+          "snapshots"
+        ],
+        "summary": "Read Bytes",
+        "description": "The snapshot's raw bytes, with the media type they were fetched with.",
+        "operationId": "snapshots-read_bytes",
+        "parameters": [
+          {
+            "name": "snapshot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Snapshot Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/octet-stream": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "summary": "Read Root",
