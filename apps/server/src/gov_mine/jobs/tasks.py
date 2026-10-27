@@ -13,6 +13,8 @@ from gov_mine.jobs.context import Trace, running, trace
 from gov_mine.resources import Resources, resources_of
 
 if TYPE_CHECKING:
+    from datetime import timedelta
+
     from sqlalchemy.ext.asyncio import AsyncSession
 
 # For a job that fails on a flaky peer (a website, a model provider): five tries, the waits
@@ -52,8 +54,15 @@ def task(
     return decorator
 
 
-async def defer(session: AsyncSession, task: AnyTask, **kwargs: JSONValue) -> int:
-    """Queue one run in `session`'s transaction and return its job ID. The job row
+async def defer(
+    session: AsyncSession,
+    task: AnyTask,
+    *,
+    schedule_in: timedelta | None = None,
+    **kwargs: JSONValue,
+) -> int:
+    """Queue one run in `session`'s transaction and return its job ID; with
+    `schedule_in`, no worker picks it up before then. The job row
     is written on the session's own connection, so it is committed, or rolled
     back, with the rows it is about; a worker is notified at commit, never before.
     (Sessions run on psycopg, which is the connection Procrastinate accepts; this
@@ -61,7 +70,10 @@ async def defer(session: AsyncSession, task: AnyTask, **kwargs: JSONValue) -> in
     last bound to (jobs/__init__.py): the process's one queue."""
     await session.flush()
     connection = await (await session.connection()).get_raw_connection()
-    deferrer = task.configure(connection=connection.driver_connection)
+    deferrer = task.configure(
+        connection=connection.driver_connection,
+        schedule_in=None if schedule_in is None else {"seconds": int(schedule_in.total_seconds())},
+    )
     # `Trace` is `dict[str, str]`, which is not a `JSONValue` (dicts are invariant).
     carrier: dict[str, JSONValue] = {**trace()}
     return await deferrer.defer_async(trace=carrier, **kwargs)

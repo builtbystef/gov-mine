@@ -1,8 +1,7 @@
 import uuid
 from datetime import UTC, datetime
-from enum import StrEnum
 
-from sqlalchemy import DateTime, Enum, MetaData
+from sqlalchemy import DateTime, MetaData
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -40,6 +39,15 @@ class UUIDPrimaryKey:
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid7, sort_order=-100)
 
 
+class CreatedAt:
+    """For rows that are written once, or whose changes are kept elsewhere: the spec gives every
+    table `created_at` and nothing more."""
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, sort_order=100
+    )
+
+
 class Timestamps:
     """Python-side defaults: set on flush, so the values are on the object after commit."""
 
@@ -48,17 +56,4 @@ class Timestamps:
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow, sort_order=100
-    )
-
-
-def string_enum[E: StrEnum](enum_type: type[E]) -> Enum:
-    """A VARCHAR holding the member values (not names), so adding a member needs no migration.
-
-    No PostgreSQL enum type and no CHECK constraint: the API validates the values.
-    """
-    return Enum(
-        enum_type,
-        native_enum=False,
-        length=32,
-        values_callable=lambda members: [member.value for member in members],
     )

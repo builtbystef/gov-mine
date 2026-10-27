@@ -14,12 +14,12 @@ apps/server/
 │   ├── main.py           # create_app(settings): the API and its lifespan
 │   ├── cli.py            # `gov-mine`, the command line
 │   ├── config.py         # Settings; every GOV_MINE_* variable is documented in .env.example
-│   ├── resources.py      # what every process opens once: database, store, queue
-│   ├── modules/          # one package per feature: health (the rest per docs/specification/06-architecture.md)
+│   ├── resources.py      # what every process opens once: database, store, queue, HTTP client
+│   ├── modules/          # one package per feature: health, institutions, crawl, ingest, runs (the rest per docs/specification/06-architecture.md)
 │   │   └── <feature>/    # router.py, schemas.py, models.py, service.py, jobs.py
-│   ├── integrations/     # ports with their adapters: storage, ai
+│   ├── integrations/     # ports with their adapters: storage, ai, http (the crawler's client)
 │   ├── jobs/             # the worker, the task registry, and platform tasks (stalled)
-│   ├── db/               # declarative base, session, and models.py, which imports every model
+│   ├── db/               # declarative base, checked strings, session, and models.py, which imports every model
 │   └── shared/           # AppError and subclasses, middleware, logs, telemetry
 ├── alembic/              # migrations
 └── tests/
@@ -38,7 +38,7 @@ apps/server/
 
 ## Adding things
 
-- **A model**: import its module in `db/models.py` so Alembic sees it, then add a migration: `uv run alembic revision --autogenerate -m "..."` from `apps/server`. CI fails on a model without a migration.
+- **A model**: import its module in `db/models.py` so Alembic sees it, then add a migration: `uv run alembic revision --autogenerate -m "..."` from `apps/server`. CI fails on a model without a migration. An enumeration is a checked string (`db/checked_strings.py`): autogenerate writes it as a `CheckedString()` column without its constraint, so write it with a `checked()` helper as `alembic/versions/2026_10_27_0811-eb3ad4f1d8e7_crawl_the_homepage.py` does.
 - **A route, or a change to request or response shapes**: run `vp run generate` from the root to regenerate the typed client.
 - **A job**: put it in a `jobs.py` next to what it works on, register it with `task()`, and list the module in `TASK_MODULES` in `jobs/__init__.py`.
 - **A setting**: add it to `Settings` and document it in `.env.example`.
@@ -50,4 +50,5 @@ apps/server/
 - **Database**: SQLAlchemy 2 async over psycopg 3, migrations with Alembic.
 - **Storage**: S3-compatible (RustFS locally); downloads use presigned URLs.
 - **Jobs**: [Procrastinate](https://procrastinate.readthedocs.io) on the app's PostgreSQL, with no broker.
+- **Runs**: `gov-mine run create` queues `crawl.start`, which queues the run's fetches and `crawl.finish`. Every job of a run carries `run_id`; `crawl.finish` marks the run finished once no other job with that `run_id` is waiting or running in `procrastinate_jobs`, and looks again every few seconds until then.
 - **Models**: [Pydantic AI](https://pydantic.dev/docs/ai/), turned on by `GOV_MINE_OPENAI_API_KEY`. Every model call is recorded in `model_calls`.

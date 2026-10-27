@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 # listed here; the tasks in this package are about the platform.
 TASK_MODULES = [
     "gov_mine.jobs.stalled",
+    "gov_mine.modules.crawl.jobs",
 ]
 
 # What every `@task` registers on. Import-time, settings-free.

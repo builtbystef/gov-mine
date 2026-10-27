@@ -1,9 +1,12 @@
+import { ActivityIcon } from "lucide-react";
 import Link from "next/link";
 
 import { Logo, Wordmark } from "@/components/shared/logo";
 import {
   Sidebar,
   SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -24,7 +27,20 @@ export function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent />
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton tooltip="Runs" render={<Link href="/runs" />}>
+                  <ActivityIcon />
+                  <span>Runs</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
     </Sidebar>
   );
 }

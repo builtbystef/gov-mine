@@ -9,13 +9,13 @@ The thinnest path through the system. `gov-mine seed` creates the CreateTO insti
 
 ## Acceptance criteria
 
-- [ ] `gov-mine seed` creates one CreateTO institution (`municipal_agency`, website `https://createto.ca/`) and a `crawl` domain for its host; running it again creates nothing new.
-- [ ] `gov-mine run create <id> --full` prints the new run's id; the run is `queued` with `settings.trigger = cli` and `settings` marking it full.
-- [ ] With a worker running, the run becomes `running`, then `finished`, with `started_at` and `finished_at` set.
-- [ ] The run has exactly one `fetches` row for the homepage, with outcome `fetched`, its HTTP status, duration and `snapshot_id`.
-- [ ] The snapshot's bytes are in object storage at `bytes/<snapshot id>`, and its row has the content hash, media type and `size_bytes` equal to the stored length.
-- [ ] `GET /runs` and `GET /runs/{id}/fetches` return limit/offset pages (`{items, total, limit, offset}`); the dashboard's Runs list shows the run and its status, and the run page lists the homepage fetch with its outcome and snapshot.
-- [ ] `run create` with an unknown institution id exits non-zero and creates no run.
+- [x] `gov-mine seed` creates one CreateTO institution (`municipal_agency`, website `https://createto.ca/`) and a `crawl` domain for its host; running it again creates nothing new.
+- [x] `gov-mine run create <id> --full` prints the new run's id; the run is `queued` with `settings.trigger = cli` and `settings` marking it full.
+- [x] With a worker running, the run becomes `running`, then `finished`, with `started_at` and `finished_at` set.
+- [x] The run has exactly one `fetches` row for the homepage, with outcome `fetched`, its HTTP status, duration and `snapshot_id`.
+- [x] The snapshot's bytes are in object storage at `bytes/<snapshot id>`, and its row has the content hash, media type and `size_bytes` equal to the stored length.
+- [x] `GET /runs` and `GET /runs/{id}/fetches` return limit/offset pages (`{items, total, limit, offset}`); the dashboard's Runs list shows the run and its status, and the run page lists the homepage fetch with its outcome and snapshot.
+- [x] `run create` with an unknown institution id exits non-zero and creates no run.
 
 ## Out of scope
 
