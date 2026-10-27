@@ -30,7 +30,7 @@ function FieldValue({ value }: { value: unknown }) {
   const text = formatValue(value);
   if (!text) return <span className="text-muted-foreground">–</span>;
   return (
-    <span className="line-clamp-2 block max-w-72 min-w-24 whitespace-normal" title={text}>
+    <span className="line-clamp-2 block max-w-72 min-w-28 whitespace-normal" title={text}>
       {text}
     </span>
   );
@@ -43,7 +43,10 @@ export function recordColumns(fields: string[], timeZone: string, showType: bool
       id: "record",
       header: first ? fieldLabel(first) : "Record",
       cell: ({ row }) => (
-        <Link href={`/records/${row.original.id}`} className="font-medium hover:underline">
+        <Link
+          href={`/records/${row.original.id}`}
+          className="line-clamp-2 block max-w-72 min-w-40 font-medium whitespace-normal hover:underline"
+        >
           {formatValue(first ? row.original.data[first] : Object.values(row.original.data)[0]) ||
             row.original.key ||
             "Record"}
