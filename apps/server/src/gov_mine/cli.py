@@ -73,10 +73,17 @@ def run_create(
     full: Annotated[  # noqa: FBT002 - a Typer flag
         bool, typer.Option("--full", help="Crawl the whole site from the homepage.")
     ] = False,
+    limit: Annotated[
+        int | None, typer.Option(min=1, help="Send at most this many requests in the run.")
+    ] = None,
 ) -> None:
     """Queue a run of the institution. Prints the run's id."""
     if not full:
         # Incremental runs come with sources; until then a run is always full.
         raise typer.BadParameter("only full runs exist yet: pass --full", param_hint="--full")
-    run = _run(lambda session: runs.create_run(session, institution_id, trigger="cli", mode="full"))
+    run = _run(
+        lambda session: runs.create_run(
+            session, institution_id, trigger="cli", mode="full", limit=limit
+        )
+    )
     typer.echo(run.id)

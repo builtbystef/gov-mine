@@ -16,7 +16,7 @@ async def start(res: Resources, *, run_id: str) -> None:
 
 
 @task(service.FETCH_TASK)
-async def fetch(res: Resources, *, run_id: str, webpage_id: str) -> None:
+async def fetch(res: Resources, *, run_id: str, webpage_id: str, depth: int) -> None:
     async with res.session() as session:
         await service.fetch_page(
             session,
@@ -24,6 +24,7 @@ async def fetch(res: Resources, *, run_id: str, webpage_id: str) -> None:
             res.object_store,
             run_id=uuid.UUID(run_id),
             webpage_id=uuid.UUID(webpage_id),
+            depth=depth,
         )
         await session.commit()
 

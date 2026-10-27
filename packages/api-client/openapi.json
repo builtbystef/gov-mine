@@ -545,6 +545,17 @@
               "incremental"
             ],
             "title": "Mode"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
           }
         },
         "type": "object",

@@ -21,15 +21,21 @@ from gov_mine.modules.runs.schemas import (
 
 
 async def create_run(
-    session: AsyncSession, institution_id: uuid.UUID, *, trigger: RunTrigger, mode: RunMode
+    session: AsyncSession,
+    institution_id: uuid.UUID,
+    *,
+    trigger: RunTrigger,
+    mode: RunMode,
+    limit: int | None = None,
 ) -> CrawlRun:
     """A `queued` run of the institution, and its `crawl.start` job in the same transaction.
-    Raises `NotFoundError` for an unknown institution, before anything is written."""
+    With `limit`, the run sends at most that many requests. Raises `NotFoundError` for an
+    unknown institution, before anything is written."""
     await institutions.get_institution(session, institution_id)
     run = CrawlRun(
         institution_id=institution_id,
         status=RunStatus.QUEUED,
-        settings=RunSettings(trigger=trigger, mode=mode).model_dump(),
+        settings=RunSettings(trigger=trigger, mode=mode, limit=limit).model_dump(),
     )
     session.add(run)
     await session.flush()

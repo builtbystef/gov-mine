@@ -1,7 +1,7 @@
-"""The thin path end to end: `gov-mine seed`, `gov-mine run create --full`, a worker that
-crawls the homepage, and the API that shows the run. On a database of its own, migrated to
-head, because the worker's jobs commit. Only the website is faked: it serves the saved
-CreateTO homepage."""
+"""Full runs end to end: `gov-mine seed`, `gov-mine run create --full`, a worker that crawls
+the site from the homepage, and the API that shows the run. On a database of its own, migrated
+to head, because the worker's jobs commit. Only the website is faked: it serves the saved
+CreateTO homepage, or a small site of its own."""
 
 import asyncio
 import hashlib
@@ -89,21 +89,55 @@ def rows(engine: Engine, sql: str, **params: Any) -> list[dict[str, Any]]:
 
 
 class Website:
-    """Serves the saved homepage, and notes the run's status as each request arrives."""
+    """Serves `pages` (URL to body; a `.pdf` as a PDF, the rest as HTML) and 404 for the rest,
+    and notes the run's status as each request arrives."""
 
-    def __init__(self) -> None:
+    def __init__(self, pages: dict[str, bytes] | None = None) -> None:
+        self.pages = pages if pages is not None else {"https://createto.ca/": HOMEPAGE}
         self.requests: list[str] = []
         self.status_during_fetch: list[str] = []
         self.session_factory: Any = None
 
     async def __call__(self, request: httpx.Request) -> httpx.Response:
-        self.requests.append(str(request.url))
+        url = str(request.url)
+        self.requests.append(url)
         async with self.session_factory() as session:
             statuses = await session.scalars(text("SELECT status FROM crawl_runs"))
             self.status_during_fetch.extend(statuses)
-        return httpx.Response(
-            200, content=HOMEPAGE, headers={"Content-Type": "text/html; charset=utf-8"}
-        )
+        if url not in self.pages:
+            return httpx.Response(404)
+        media_type = "application/pdf" if url.endswith(".pdf") else "text/html; charset=utf-8"
+        return httpx.Response(200, content=self.pages[url], headers={"Content-Type": media_type})
+
+
+def page(*hrefs: str, script: str = "") -> bytes:
+    """An HTML page linking to `hrefs`, with `script` as its `__NEXT_DATA__`."""
+    links = "".join(f'<a href="{href}">link</a>' for href in hrefs)
+    return (
+        f'<html><body>{links}<script id="__NEXT_DATA__" type="application/json">{script}</script>'
+        "</body></html>"
+    ).encode()
+
+
+def create_run(*options: str) -> str:
+    """Seed CreateTO and create a full run of it with `options`; its id."""
+    _, seeded = invoke("seed")
+    exit_code, output = invoke("run", "create", seeded.split()[0], "--full", *options)
+    assert exit_code == 0, output
+    return output.strip()
+
+
+def fetches_by_url(engine: Engine, run_id: str) -> dict[str, dict[str, Any]]:
+    """The run's fetch rows by URL; a URL attempted twice fails the test."""
+    fetches = rows(
+        engine,
+        "SELECT f.*, w.url FROM fetches f JOIN webpages w ON w.id = f.webpage_id"
+        " WHERE f.crawl_run_id = :id",
+        id=run_id,
+    )
+    by_url = {fetch["url"]: fetch for fetch in fetches}
+    assert len(by_url) == len(fetches), "a URL was attempted twice"
+    return by_url
 
 
 async def crawl(settings: Settings, run_id: str, website: Website) -> MemoryObjectStore:
@@ -168,13 +202,14 @@ def test_a_full_run_crawls_the_homepage_into_a_snapshot(crawl_settings: Settings
     invoke("seed")
     (institution,) = rows(database, "SELECT id FROM institutions")
 
-    exit_code, output = invoke("run", "create", str(institution["id"]), "--full")
+    # The saved homepage links to the whole site: one request is enough here.
+    exit_code, output = invoke("run", "create", str(institution["id"]), "--full", "--limit", "1")
 
     assert exit_code == 0, output
     run_id = output.strip()
     (run,) = rows(database, "SELECT * FROM crawl_runs WHERE id = :id", id=run_id)
     assert run["status"] == "queued"
-    assert run["settings"] == {"trigger": "cli", "mode": "full"}
+    assert run["settings"] == {"trigger": "cli", "mode": "full", "limit": 1}
     assert run["institution_id"] == institution["id"]
     queued = rows(database, "SELECT task_name, args FROM procrastinate_jobs")
     assert [(job["task_name"], job["args"]["run_id"]) for job in queued] == [
@@ -242,7 +277,7 @@ def test_a_runs_log_lines_carry_its_run_job_and_webpage_ids(
 ):
     invoke("seed")
     (institution,) = rows(database, "SELECT id FROM institutions")
-    _, output = invoke("run", "create", str(institution["id"]), "--full")
+    _, output = invoke("run", "create", str(institution["id"]), "--full", "--limit", "1")
     run_id = output.strip()
 
     caplog.handler.addFilter(ContextFilter())
@@ -252,14 +287,18 @@ def test_a_runs_log_lines_carry_its_run_job_and_webpage_ids(
 
     lines = [json.loads(line) for line in caplog.text.splitlines()]
     job_done = re.compile(r"(crawl\.start|crawl\.fetch)\[(\d+)\] done in .*")
-    done = {
-        match[1]: (int(match[2]), line)
+    done = [
+        (match[1], int(match[2]), line)
         for line in lines
         if (match := job_done.fullmatch(line["message"]))
-    }
+    ]
     (fetch,) = rows(database, "SELECT webpage_id FROM fetches")
 
-    fetch_job_id, fetch_line = done["crawl.fetch"]
+    ((fetch_job_id, fetch_line),) = [
+        (job_id, line)
+        for task, job_id, line in done
+        if task == "crawl.fetch" and line.get("webpage_id") == str(fetch["webpage_id"])
+    ]
     assert fetch_line["run_id"] == run_id
     assert fetch_line["job_id"] == fetch_job_id
     assert fetch_line["webpage_id"] == str(fetch["webpage_id"])
@@ -271,7 +310,148 @@ def test_a_runs_log_lines_carry_its_run_job_and_webpage_ids(
         str(fetch["webpage_id"]),
     )
 
-    start_job_id, start_line = done["crawl.start"]
+    ((start_job_id, start_line),) = [
+        (job_id, line) for task, job_id, line in done if task == "crawl.start"
+    ]
     assert start_line["run_id"] == run_id
     assert start_line["job_id"] == start_job_id
     assert "webpage_id" not in start_line
+
+
+SITE = "https://createto.ca"
+
+
+def test_a_full_run_follows_links_within_the_site_once_each(
+    crawl_settings: Settings, database: Engine
+):
+    run_id = create_run()
+    website = Website(
+        {
+            f"{SITE}/": page(
+                "/projects/",
+                "/about#team",
+                "https://elsewhere.example/page",
+                "mailto:info@createto.ca",
+                # Only in the embedded JSON, as createto.ca does with some files.
+                script='{"filename":"https:\\/\\/createto.ca\\/files\\/report.pdf"}',
+            ),
+            f"{SITE}/projects": page("/", "/about", "/projects/a?utm_source=nav"),
+            f"{SITE}/about": page("/projects", "https://createto.ca:443/projects/a"),
+            f"{SITE}/projects/a": page(),
+            f"{SITE}/files/report.pdf": b"%PDF-1.4",
+        }
+    )
+
+    asyncio.run(crawl(crawl_settings, run_id, website))
+
+    (run,) = rows(database, "SELECT status FROM crawl_runs")
+    assert run["status"] == "finished"
+    # Every page and file of the site requested once, under its normalised URL.
+    assert sorted(website.requests) == [
+        f"{SITE}/",
+        f"{SITE}/about",
+        f"{SITE}/files/report.pdf",
+        f"{SITE}/projects",
+        f"{SITE}/projects/a",
+    ]
+    # One row per URL, found on the page it was first seen on.
+    webpages = rows(database, "SELECT id, url, discovered_from_webpage_id FROM webpages")
+    ids = {webpage["url"]: webpage["id"] for webpage in webpages}
+    found_on = {webpage["url"]: webpage["discovered_from_webpage_id"] for webpage in webpages}
+    assert found_on == {
+        f"{SITE}/": None,
+        f"{SITE}/projects": ids[f"{SITE}/"],
+        f"{SITE}/about": ids[f"{SITE}/"],
+        f"{SITE}/files/report.pdf": ids[f"{SITE}/"],
+        "https://elsewhere.example/page": ids[f"{SITE}/"],
+        f"{SITE}/projects/a": ids[f"{SITE}/projects"],
+    }
+    # The other host's link is logged as refused, with no request.
+    fetches = fetches_by_url(database, run_id)
+    assert set(fetches) == set(ids)
+    elsewhere = fetches.pop("https://elsewhere.example/page")
+    assert (elsewhere["outcome"], elsewhere["reason"]) == ("skipped_scope", "other_host")
+    assert (elsewhere["duration_ms"], elsewhere["http_status"]) == (None, None)
+    assert {fetch["outcome"] for fetch in fetches.values()} == {"fetched"}
+    (domain,) = rows(database, "SELECT crawl_policy FROM domains WHERE name = 'elsewhere.example'")
+    assert domain["crawl_policy"] == "files_only"
+
+
+def test_a_url_more_than_50_links_from_a_seed_is_not_requested(
+    crawl_settings: Settings, database: Engine
+):
+    run_id = create_run()
+    # A chain: the homepage links to /p/1, and /p/n to /p/n+1.
+    pages = {f"{SITE}/": page("/p/1")}
+    pages |= {f"{SITE}/p/{n}": page(f"/p/{n + 1}") for n in range(1, 60)}
+    website = Website(pages)
+
+    asyncio.run(crawl(crawl_settings, run_id, website))
+
+    # /p/n is n links from the homepage: /p/50 is fetched, /p/51 is not.
+    assert website.requests == [f"{SITE}/"] + [f"{SITE}/p/{n}" for n in range(1, 51)]
+    fetches = fetches_by_url(database, run_id)
+    deepest = fetches[f"{SITE}/p/51"]
+    assert deepest["outcome"] == "skipped_depth"
+    assert (deepest["duration_ms"], deepest["http_status"]) == (None, None)
+    assert fetches[f"{SITE}/p/50"]["outcome"] == "fetched"
+    assert len(fetches) == 52
+
+
+def test_urls_outside_the_website_prefix_are_not_requested(
+    crawl_settings: Settings, database: Engine
+):
+    run_id = create_run()
+    with database.begin() as connection:
+        connection.execute(
+            text("UPDATE institutions SET website_url = 'https://createto.ca/projects/'")
+        )
+    website = Website(
+        {
+            f"{SITE}/projects": page(
+                "/projects/a",
+                "/projects-archive",
+                "/about",
+                "http://createto.ca/projects/b",
+                "https://www.createto.ca/projects/c",
+            ),
+            f"{SITE}/projects/a": page(),
+        }
+    )
+
+    asyncio.run(crawl(crawl_settings, run_id, website))
+
+    assert sorted(website.requests) == [f"{SITE}/projects", f"{SITE}/projects/a"]
+    refused = {
+        url: (fetch["outcome"], fetch["reason"], fetch["duration_ms"])
+        for url, fetch in fetches_by_url(database, run_id).items()
+        if fetch["outcome"] != "fetched"
+    }
+    assert refused == {
+        f"{SITE}/projects-archive": ("skipped_scope", "outside_prefix", None),
+        f"{SITE}/about": ("skipped_scope", "outside_prefix", None),
+        "http://createto.ca/projects/b": ("skipped_scope", "outside_prefix", None),
+        "https://www.createto.ca/projects/c": ("skipped_scope", "other_host", None),
+    }
+
+
+def test_run_create_limit_caps_the_requests_the_run_sends(
+    crawl_settings: Settings, database: Engine
+):
+    run_id = create_run("--limit", "3")
+    (run,) = rows(database, "SELECT settings FROM crawl_runs")
+    assert run["settings"] == {"trigger": "cli", "mode": "full", "limit": 3}
+    pages = {f"{SITE}/": page("https://elsewhere.example/", *(f"/p/{n}" for n in range(10)))}
+    pages |= {f"{SITE}/p/{n}": page(*(f"/p/{n}/{m}" for m in range(10))) for n in range(10)}
+    website = Website(pages)
+
+    asyncio.run(crawl(crawl_settings, run_id, website))
+
+    (run,) = rows(database, "SELECT status FROM crawl_runs")
+    assert run["status"] == "finished"
+    assert len(website.requests) == 3
+    fetches = fetches_by_url(database, run_id).values()
+    assert len([fetch for fetch in fetches if fetch["duration_ms"] is not None]) == 3
+    # The rest of the eleven links found wrote nothing, but a refusal, which costs no request.
+    assert {fetch["outcome"] for fetch in fetches} <= {"fetched", "skipped_scope"}
+    assert len(rows(database, "SELECT id FROM webpages")) > len(fetches)

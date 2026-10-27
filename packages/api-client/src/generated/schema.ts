@@ -248,6 +248,8 @@ export interface components {
              * @enum {string}
              */
             mode: "full" | "incremental";
+            /** Limit */
+            limit?: number | null;
         };
         /**
          * RunStatus

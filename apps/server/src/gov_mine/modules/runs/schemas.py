@@ -16,6 +16,8 @@ class RunSettings(BaseModel):
     trigger: RunTrigger
     # A full run crawls the whole site from the homepage; an incremental one, the due sources.
     mode: RunMode
+    # At most this many requests are sent (`--limit`, a development knob); refusals don't count.
+    limit: int | None = None
 
 
 class RunOutput(BaseModel):
