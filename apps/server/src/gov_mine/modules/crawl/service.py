@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from gov_mine.db.base import utcnow
 from gov_mine.integrations.http import ROBOT_NAME
+from gov_mine.integrations.http.replay import replay_request, saved_urls
 from gov_mine.integrations.storage import ObjectStore
 from gov_mine.jobs import registry
 from gov_mine.jobs.tasks import defer
@@ -93,6 +94,8 @@ sleep = asyncio.sleep
 # How the fence finds the addresses a host name stands for. Tests swap it for one that does not
 # ask DNS.
 resolve = addresses.resolve
+# The URLs each replay run's server holds, read once per run and process.
+_replay_sets: dict[uuid.UUID, frozenset[str]] = {}
 
 # Whether any job of the run other than `crawl.finish` is waiting or running. Every job of a
 # run carries its `run_id`; a job queues its follow-ups in its own transaction, before it is
@@ -241,19 +244,27 @@ async def start_run(session: AsyncSession, http: httpx.AsyncClient, run_id: uuid
     domain = await ensure_domain(session, host_of(homepage_url), CrawlPolicy.CRAWL)
     homepage = await ensure_webpage(session, homepage_url, domain.id)
     await queue_fetch(session, run.id, homepage.id, domain.id, 0)
-    seeds = await read_sitemap(session, http, domain.id, homepage_url)
+    seeds = await read_sitemap(
+        session, http, domain.id, homepage_url, replay=run.settings.get("replay")
+    )
     queued = await queue_links(session, run.id, None, seeds, 0)
     logger.info("Run %s seeded with the homepage and %d sitemap URLs", run.id, queued)
     await queue(session, FINISH_TASK, run_id=str(run.id))
 
 
 async def read_sitemap(
-    session: AsyncSession, http: httpx.AsyncClient, domain_id: uuid.UUID, homepage_url: str
+    session: AsyncSession,
+    http: httpx.AsyncClient,
+    domain_id: uuid.UUID,
+    homepage_url: str,
+    *,
+    replay: str | None = None,
 ) -> list[str]:
     """The normalised page URLs listed by `/sitemap.xml` on the homepage's host (its domain is
     `domain_id`), and, when it is an index, by the sitemap files it points to on the same host,
     each once, paced like any request to the host. A file that is missing, fails, or is not a
-    sitemap adds nothing; at most `MAX_SITEMAPS` files are read."""
+    sitemap adds nothing; at most `MAX_SITEMAPS` files are read. With `replay`, the files are
+    asked of the replay server at that address."""
     host = host_of(homepage_url)
     pending = [urljoin(homepage_url, SITEMAP_PATH)]
     seen = set(pending)
@@ -263,8 +274,9 @@ async def read_sitemap(
             break
         url = pending.pop(0)
         await wait_for_host(session, domain_id)
+        target, headers = replay_request(url, replay)
         try:
-            response = await http.get(url)
+            response = await http.get(target, headers=headers)
         except httpx.HTTPError as exc:
             logger.warning("Sitemap %s not read: %s", url, type(exc).__name__)
             continue
@@ -308,6 +320,20 @@ async def address_refusal(url: str) -> tuple[FetchOutcome, str] | None:
             return None
     if not all(addresses.is_public(address) for address in found):
         return FetchOutcome.SKIPPED_SCOPE, "private_address"
+    return None
+
+
+async def replay_refusal(
+    http: httpx.AsyncClient, run_id: uuid.UUID, replay: str, url: str
+) -> tuple[FetchOutcome, str] | None:
+    """On a replay run, the fence's address check: `url` is refused unless the replay server
+    holds it. The request goes to the replay server, not to `url`'s host, so neither is checked
+    for a private address: the server's address is the operator's choice."""
+    saved = _replay_sets.get(run_id)
+    if saved is None:
+        saved = _replay_sets[run_id] = await saved_urls(http, replay)
+    if url not in saved:
+        return FetchOutcome.SKIPPED_SCOPE, "not_in_replay"
     return None
 
 
@@ -359,13 +385,17 @@ class Download:
     encoding: str = "utf-8"
 
 
-async def download(http: httpx.AsyncClient, url: str, max_bytes: int) -> Download:
+async def download(
+    http: httpx.AsyncClient, url: str, max_bytes: int, *, replay: str | None = None
+) -> Download:
     """Send one GET for `url` and stream its body, unless it is not a 200 (`failed_http`), its
     headers refuse it (`response_refusal`) or it streams past `max_bytes` (`skipped_size`): the
-    rest of the body is then never read. A timeout is `failed_timeout`."""
+    rest of the body is then never read. A timeout is `failed_timeout`. With `replay`, the GET
+    goes to the replay server at that address."""
     got = Download()
+    target, headers = replay_request(url, replay)
     try:
-        async with http.stream("GET", url) as response:
+        async with http.stream("GET", target, headers=headers) as response:
             got.http_status = response.status_code
             got.media_type = media_type_of(response)
             got.encoding = response.encoding or got.encoding
@@ -424,7 +454,7 @@ async def robots_refusal(
         ).one()
         if _robots_stale(domain, run):
             await wait_for_host(session, domain.id)
-            await read_robots(http, domain, url)
+            await read_robots(http, domain, url, replay=run.settings.get("replay"))
     if domain.robots_txt is None:
         return FetchOutcome.BLOCKED_ROBOTS, "robots_unreachable"
     if not robots_allows(domain.robots_txt, url, ROBOT_NAME):
@@ -438,14 +468,18 @@ def _robots_stale(domain: Domain, run: CrawlRun) -> bool:
     return fetched is None or (run.started_at is not None and fetched < run.started_at)
 
 
-async def read_robots(http: httpx.AsyncClient, domain: Domain, url: str) -> None:
+async def read_robots(
+    http: httpx.AsyncClient, domain: Domain, url: str, *, replay: str | None = None
+) -> None:
     """Read the robots.txt governing `url` into `domain`, following redirects, and set the
     host's delay from it. A 4xx is no robots.txt: stored as "", every path is allowed. A 5xx
     or a failed request stores None, which refuses every path until the next run reads it
-    again (RFC 9309, "unreachable")."""
+    again (RFC 9309, "unreachable"). With `replay`, it is asked of the replay server at that
+    address, which never redirects."""
     location = robots_url(url)
+    target, headers = replay_request(location, replay)
     try:
-        response = await http.get(location, follow_redirects=True)
+        response = await http.get(target, headers=headers, follow_redirects=True)
     except httpx.HTTPError as exc:
         logger.warning("robots.txt %s not read: %s", location, type(exc).__name__)
         domain.robots_txt = None
@@ -489,11 +523,14 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
     again up to `RETRIES` times (within `--limit`), `RETRY_BACKOFF_SECONDS` doubling each time,
     each try its own row. A 404 sets the webpage's `missing_since`, a 200 clears it. A request,
     robots.txt's included, first waits out the host's delay; a sent request's `requested_at` is
-    when it was sent. Returns the last row written."""
+    when it was sent. On a replay run (`settings.replay`), every request goes to the replay
+    server, and the address check is replaced by the saved set: a URL the server does not hold
+    is `skipped_scope` `not_in_replay`. Returns the last row written."""
     run = await get_run(session, run_id)
     # A run from before the cap was recorded gets today's.
     max_bytes: int = run.settings.get("max_file_bytes", MAX_FILE_BYTES)
     limit = run.settings.get("limit")
+    replay: str | None = run.settings.get("replay")
     sent = 0
     last_request = False
     if limit is not None:
@@ -506,9 +543,11 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
     webpage = await session.get_one(Webpage, webpage_id)
     domain = await session.get_one(Domain, webpage.domain_id)
     fetch = Fetch(crawl_run_id=run.id, webpage_id=webpage.id, requested_at=utcnow())
-    refused = await address_refusal(webpage.url) or refusal(
-        webpage.url, domain.crawl_policy, institution.website_url, depth
-    )
+    refused = (
+        await replay_refusal(http, run.id, replay, webpage.url)
+        if replay
+        else await address_refusal(webpage.url)
+    ) or refusal(webpage.url, domain.crawl_policy, institution.website_url, depth)
     if refused is None:
         refused = await robots_refusal(session, http, run, domain, webpage.url)
     refused = refused or type_refusal(webpage.url)
@@ -533,6 +572,7 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
             depth=depth,
             max_bytes=max_bytes,
             follow=follow,
+            replay=replay,
         )
         if not _transient(fetch):
             break
@@ -562,12 +602,13 @@ async def _send(  # noqa: PLR0913 - one try of fetch_page, with what it works wi
     depth: int,
     max_bytes: int,
     follow: bool,
+    replay: str | None,
 ) -> None:
     """One try at `webpage`, once its host's delay has passed, logged in `fetch`: what it kept,
     and, when `follow`, the links of an HTML page queued one link deeper."""
     fetch.requested_at = await wait_for_host(session, webpage.domain_id)
     started = time.perf_counter()
-    got = await download(http, webpage.url, max_bytes)
+    got = await download(http, webpage.url, max_bytes, replay=replay)
     fetch.duration_ms = _ms_since(started)
     fetch.http_status = got.http_status
     if got.http_status == httpx.codes.NOT_FOUND:
@@ -723,6 +764,7 @@ __all__ = [
     "read_robots",
     "read_sitemap",
     "refusal",
+    "replay_refusal",
     "response_refusal",
     "robots_refusal",
     "start_run",

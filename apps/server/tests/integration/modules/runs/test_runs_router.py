@@ -101,6 +101,7 @@ def test_runs_are_listed_newest_first_a_page_at_a_time(client: TestClient, db: D
         "limit": 25,
         "max_file_bytes": None,
         "extractors": None,
+        "replay": None,
     }
     assert older["id"] == str(ids["older"])
     assert older["status"] == "queued"
@@ -110,6 +111,7 @@ def test_runs_are_listed_newest_first_a_page_at_a_time(client: TestClient, db: D
         "limit": None,
         "max_file_bytes": None,
         "extractors": None,
+        "replay": None,
     }
 
 

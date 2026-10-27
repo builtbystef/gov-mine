@@ -23,6 +23,9 @@ class RunSettings(BaseModel):
     max_file_bytes: int | None = None
     # The extractor per record type (`model:<record_type>@<version>`); None on older runs.
     extractors: dict[str, str] | None = None
+    # The replay server's address on a replay run, which sends it every request; None on a live
+    # run.
+    replay: str | None = None
 
 
 class RunCreate(BaseModel):

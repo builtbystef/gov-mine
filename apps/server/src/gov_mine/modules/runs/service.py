@@ -29,18 +29,20 @@ from gov_mine.shared.exceptions import ConflictError
 ACTIVE_STATUSES = (RunStatus.QUEUED, RunStatus.RUNNING)
 
 
-async def create_run(
+async def create_run(  # noqa: PLR0913 - the run's settings, as keywords
     session: AsyncSession,
     institution_id: uuid.UUID,
     *,
     trigger: RunTrigger,
     mode: RunMode,
     limit: int | None = None,
+    replay: str | None = None,
 ) -> CrawlRun:
     """A `queued` run of the institution, and its `crawl.start` job in the same transaction.
     With `limit`, the run sends at most that many requests. Its settings record the fence's
-    size cap. Raises `NotFoundError` for an unknown institution and `ConflictError` when it has
-    a queued or running run, before anything is written."""
+    size cap, and, on a replay run, the replay server's address `replay`. Raises
+    `NotFoundError` for an unknown institution and `ConflictError` when it has a queued or
+    running run, before anything is written."""
     await institutions.get_institution(session, institution_id)
     active = await session.scalar(
         select(CrawlRun.id).where(
@@ -58,6 +60,7 @@ async def create_run(
             limit=limit,
             max_file_bytes=crawl.MAX_FILE_BYTES,
             extractors=extract.extractor_versions(),
+            replay=replay,
         ).model_dump(),
     )
     session.add(run)

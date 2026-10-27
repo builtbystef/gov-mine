@@ -36,6 +36,7 @@ from typer.testing import CliRunner
 
 from gov_mine.cli import app as cli
 from gov_mine.integrations.http import USER_AGENT, create_http_client
+from gov_mine.integrations.http.replay import CORRUPT_FILE, EDITED_PAGE, URL_HEADER, replay_app
 from gov_mine.integrations.storage.memory import MemoryObjectStore
 from gov_mine.main import create_app
 from gov_mine.modules.crawl import service
@@ -271,7 +272,12 @@ async def start(settings: Settings, run_id: str, website: Website) -> list[dict[
 
 
 async def crawl(
-    settings: Settings, run_id: str, website: Website, *, concurrency: int = 2
+    settings: Settings,
+    run_id: str,
+    website: Website | ReplayServer,
+    *,
+    concurrency: int = 2,
+    deadline_seconds: float = DEADLINE_SECONDS,
 ) -> MemoryObjectStore:
     """Run a worker until the run is no longer queued or running, and return what it stored."""
     store = MemoryObjectStore()
@@ -290,7 +296,7 @@ async def crawl(
             )
         )
         try:
-            deadline = time.monotonic() + DEADLINE_SECONDS
+            deadline = time.monotonic() + deadline_seconds
             while time.monotonic() < deadline:
                 async with resources.session() as session:
                     run = await session.get_one(CrawlRun, uuid.UUID(run_id))
@@ -348,6 +354,7 @@ def test_a_full_run_crawls_the_homepage_into_a_snapshot(crawl_settings: Settings
         "limit": 1,
         "max_file_bytes": 100 * 1024 * 1024,
         "extractors": EXTRACTORS,
+        "replay": None,
     }
     assert run["institution_id"] == institution["id"]
     queued = rows(database, "SELECT task_name, args FROM procrastinate_jobs")
@@ -594,6 +601,7 @@ def test_run_create_limit_caps_the_requests_the_run_sends(
         "limit": 3,
         "max_file_bytes": 100 * 1024 * 1024,
         "extractors": EXTRACTORS,
+        "replay": None,
     }
     pages = {f"{SITE}/": page("https://elsewhere.example/", *(f"/p/{n}" for n in range(10)))}
     pages |= {f"{SITE}/p/{n}": page(*(f"/p/{n}/{m}" for m in range(10))) for n in range(10)}
@@ -1308,3 +1316,73 @@ def test_a_full_run_whose_homepage_cannot_be_fetched_fails_with_the_error_shown(
     with TestClient(app) as client:
         shown = client.get(f"/runs/{run_id}").json()
     assert (shown["status"], shown["error"]) == ("failed", error)
+
+
+REPLAY = "http://127.0.0.1:8765"
+
+
+class ReplayServer:
+    """`gov-mine dev replay --from fixtures/` in process, with or without its variants. Notes
+    where each request went and the URL it asked for."""
+
+    def __init__(self, *, variants: bool) -> None:
+        self.transport = httpx.ASGITransport(
+            app=replay_app(SERVER_ROOT / "fixtures", variants=variants)
+        )
+        self.requests: list[tuple[str, str | None]] = []
+        self.session_factory: Any = None
+
+    async def __call__(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append((str(request.url), request.headers.get(URL_HEADER)))
+        response = await self.transport.handle_async_request(request)
+        content = await response.aread()
+        return httpx.Response(response.status_code, headers=response.headers, content=content)
+
+
+def test_replay_runs_show_the_changed_page_and_the_failed_file_then_nothing_new(
+    crawl_settings: Settings, database: Engine, dns: dict[str, list[str]]
+):
+    # The live host's address is not public: a replay run neither checks nor reaches it.
+    dns["createto.ca"] = ["10.0.0.1"]
+
+    def replay(server: ReplayServer) -> dict[str, dict[str, Any]]:
+        run_id = create_run("--replay", f"{REPLAY}/")
+        # Parsing the saved PDFs takes most of it.
+        asyncio.run(crawl(crawl_settings, run_id, server, concurrency=4, deadline_seconds=240))
+        (run,) = rows(database, "SELECT status, settings FROM crawl_runs WHERE id = :id", id=run_id)
+        assert run["status"] == "finished"
+        assert run["settings"]["replay"] == REPLAY
+        # Every request went to the replay server, asking for the URL it wanted.
+        assert server.requests
+        assert {url for url, _ in server.requests} == {f"{REPLAY}/"}
+        return fetches_by_url(database, run_id)
+
+    as_saved = ReplayServer(variants=False)
+    first = replay(as_saved)
+    asked = {wanted for _, wanted in as_saved.requests}
+    assert {"https://createto.ca/", EDITED_PAGE, CORRUPT_FILE} <= asked
+    assert first[EDITED_PAGE]["outcome"] == "fetched"
+    assert first[CORRUPT_FILE]["outcome"] == "fetched"
+    # The sitemap lists pages that were never saved: refused, and never asked for.
+    not_saved = {url: f for url, f in first.items() if f["reason"] == "not_in_replay"}
+    assert not_saved
+    assert {(f["outcome"], f["http_status"], f["duration_ms"]) for f in not_saved.values()} == {
+        ("skipped_scope", None, None)
+    }
+    assert not asked & set(not_saved)
+
+    second = replay(ReplayServer(variants=True))
+    written = {url: f for url, f in second.items() if f["outcome"] == "fetched"}
+    assert set(written) == {EDITED_PAGE, CORRUPT_FILE}
+    text_status = {
+        row["id"]: row["text_status"]
+        for row in rows(database, "SELECT id, text_status FROM webpage_snapshots")
+    }
+    assert text_status[written[EDITED_PAGE]["snapshot_id"]] == "ready"
+    assert text_status[written[CORRUPT_FILE]["snapshot_id"]] == "failed"
+
+    third = replay(ReplayServer(variants=True))
+    assert [url for url, f in third.items() if f["outcome"] == "fetched"] == []
+    assert third[EDITED_PAGE]["outcome"] == "unchanged"
+    # A replay never marks a live page missing.
+    assert rows(database, "SELECT url FROM webpages WHERE missing_since IS NOT NULL") == []

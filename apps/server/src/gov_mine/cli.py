@@ -5,12 +5,15 @@ environment."""
 import asyncio
 import uuid
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 from typing import Annotated
 
 import typer
+import uvicorn
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gov_mine.config import Settings
+from gov_mine.integrations.http.replay import replay_address, replay_app
 from gov_mine.jobs import worker as jobs_worker
 from gov_mine.modules.institutions import service as institutions
 from gov_mine.modules.runs import service as runs
@@ -20,6 +23,8 @@ from gov_mine.shared.exceptions import AppError
 app = typer.Typer()
 run_app = typer.Typer(help="Create crawl runs.")
 app.add_typer(run_app, name="run")
+dev_app = typer.Typer(help="Development tools.")
+app.add_typer(dev_app, name="dev")
 
 
 @app.callback()
@@ -76,14 +81,53 @@ def run_create(
     limit: Annotated[
         int | None, typer.Option(min=1, help="Send at most this many requests in the run.")
     ] = None,
+    replay: Annotated[
+        str | None,
+        typer.Option(
+            metavar="ADDRESS",
+            help="Send every request to the replay server at this address (`gov-mine dev replay`).",
+        ),
+    ] = None,
 ) -> None:
     """Queue a run of the institution. Prints the run's id."""
     if not full:
         # Incremental runs come with sources; until then a run is always full.
         raise typer.BadParameter("only full runs exist yet: pass --full", param_hint="--full")
+    if replay is not None:
+        try:
+            replay = replay_address(replay)
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc), param_hint="--replay") from None
     run = _run(
         lambda session: runs.create_run(
-            session, institution_id, trigger="cli", mode="full", limit=limit
+            session, institution_id, trigger="cli", mode="full", limit=limit, replay=replay
         )
     )
     typer.echo(run.id)
+
+
+@dev_app.command("replay")
+def dev_replay(
+    from_: Annotated[
+        Path,
+        typer.Option(
+            "--from",
+            exists=True,
+            file_okay=False,
+            help="The saved copies: a folder of bodies, each with its `<name>.meta.json`.",
+        ),
+    ],
+    host: Annotated[str, typer.Option(help="The address to listen on.")] = "127.0.0.1",
+    port: Annotated[int, typer.Option(help="The port to listen on.")] = 8765,
+    as_saved: Annotated[  # noqa: FBT002 - a Typer flag
+        bool,
+        typer.Option(
+            "--as-saved", help="Serve the copies as saved, without the edited page and bad PDF."
+        ),
+    ] = False,
+) -> None:
+    """Serve the saved copies of every website for `run create --replay`, with one project
+    page's phase changed and one PDF replaced by a corrupt file."""
+    server = replay_app(from_, variants=not as_saved)
+    typer.echo(f"Replaying {from_} at http://{host}:{port}")
+    uvicorn.run(server, host=host, port=port, log_level="warning")
