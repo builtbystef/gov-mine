@@ -309,6 +309,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Documents
+         * @description Documents, newest dated first and undated last, by institution, type, or dated on or
+         *     after `since`.
+         */
+        get: operations["documents-list_documents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/documents/{document_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Document
+         * @description The document with its parent document, if any, and its versions: the webpage's snapshots
+         *     with distinct text, newest first.
+         */
+        get: operations["documents-read_document"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ai-calls": {
         parameters: {
             query?: never;
@@ -513,6 +555,45 @@ export interface components {
             verified: boolean;
         };
         /**
+         * DocumentDetail
+         * @description A document with its institution, its parent document if any, and its versions, newest
+         *     first.
+         */
+        DocumentDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Webpage Id
+             * Format: uuid
+             */
+            webpage_id: string;
+            /** Url */
+            url: string;
+            document_type: components["schemas"]["DocumentType"];
+            /** Title */
+            title: string | null;
+            /** Document Date */
+            document_date: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Institution Id
+             * Format: uuid
+             */
+            institution_id: string;
+            /** Institution Name */
+            institution_name: string;
+            parent: components["schemas"]["DocumentRef"] | null;
+            /** Versions */
+            versions: components["schemas"]["DocumentVersion"][];
+        };
+        /**
          * DocumentOutput
          * @description A document a run's classifications found.
          */
@@ -540,6 +621,16 @@ export interface components {
              */
             created_at: string;
         };
+        /** DocumentRef */
+        DocumentRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string | null;
+        };
         /**
          * DocumentType
          * @description What a source lists and what a document is. A `project_material` is assigned by a
@@ -552,6 +643,26 @@ export interface components {
             document_type: components["schemas"]["DocumentType"];
             /** Count */
             count: number;
+        };
+        /**
+         * DocumentVersion
+         * @description A snapshot whose text differs from every earlier one's.
+         */
+        DocumentVersion: {
+            /**
+             * Snapshot Id
+             * Format: uuid
+             */
+            snapshot_id: string;
+            /** Text Hash */
+            text_hash: string | null;
+            /** Media Type */
+            media_type: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /**
          * FetchOutcome
@@ -1250,9 +1361,12 @@ export interface components {
 export type AiCallOutput = components['schemas']['AICallOutput'];
 export type AiPurpose = components['schemas']['AIPurpose'];
 export type CitationOutput = components['schemas']['CitationOutput'];
+export type DocumentDetail = components['schemas']['DocumentDetail'];
 export type DocumentOutput = components['schemas']['DocumentOutput'];
+export type DocumentRef = components['schemas']['DocumentRef'];
 export type DocumentType = components['schemas']['DocumentType'];
 export type DocumentTypeCount = components['schemas']['DocumentTypeCount'];
+export type DocumentVersion = components['schemas']['DocumentVersion'];
 export type FetchOutcome = components['schemas']['FetchOutcome'];
 export type FetchOutput = components['schemas']['FetchOutput'];
 export type FieldChange = components['schemas']['FieldChange'];
@@ -1832,6 +1946,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_DocumentOutput_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    "documents-list_documents": {
+        parameters: {
+            query?: {
+                institution?: string | null;
+                type?: components["schemas"]["DocumentType"] | null;
+                since?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_DocumentOutput_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    "documents-read_document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentDetail"];
                 };
             };
             /** @description Validation Error */

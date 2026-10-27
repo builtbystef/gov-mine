@@ -32,3 +32,27 @@ class DocumentOutput(BaseModel):
     title: str | None
     document_date: datetime | None
     created_at: datetime
+
+
+class DocumentRef(BaseModel):
+    id: uuid.UUID
+    title: str | None
+
+
+class DocumentVersion(BaseModel):
+    """A snapshot whose text differs from every earlier one's."""
+
+    snapshot_id: uuid.UUID
+    text_hash: str | None
+    media_type: str
+    created_at: datetime
+
+
+class DocumentDetail(DocumentOutput):
+    """A document with its institution, its parent document if any, and its versions, newest
+    first."""
+
+    institution_id: uuid.UUID
+    institution_name: str
+    parent: DocumentRef | None
+    versions: list[DocumentVersion]

@@ -13,4 +13,4 @@ The dashboard lists records by type and shows each record with its fields, the c
 - [x] `GET /records/{id}` returns the record's current fields, each with its citation (URL, page, excerpt, verified), and its record snapshots, newest first.
 - [x] On the record page each field shows its excerpt and verified flag, and links to the snapshot page with the excerpt highlighted.
 - [x] The record page shows its history, each record snapshot as a diff of changed fields against the previous one.
-- [ ] The document page lists the records extracted from the document.
+- [x] The document page lists the records extracted from the document.

@@ -127,9 +127,9 @@ function documentColumns(timeZone: string) {
       header: "Title",
       cell: ({ row }) => (
         <span className="flex flex-col gap-0.5">
-          <span className="font-medium">
-            {row.original.title ?? <span className="text-muted-foreground">Untitled</span>}
-          </span>
+          <Link href={`/documents/${row.original.id}`} className="font-medium hover:underline">
+            {row.original.title ?? "Untitled"}
+          </Link>
           <WebpageLink id={row.original.webpage_id} url={row.original.url} />
         </span>
       ),

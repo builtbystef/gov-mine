@@ -234,3 +234,37 @@ def test_a_provider_error_is_retried_once_then_recorded(
     assert classification.error is not None
     assert "502" in classification.error
     assert db.run(_rows, db, AICall) == []
+
+
+async def _store_release(
+    db: Database, store: MemoryObjectStore, run_id: uuid.UUID, data: bytes
+) -> None:
+    async with db.session() as session:
+        webpage = await session.scalar(select(Webpage).where(Webpage.url == RELEASE))
+        assert webpage is not None
+        await ingest.store(session, store, webpage.id, data, "text/html", run_id=run_id)
+        await session.commit()
+
+
+def test_documents_are_listed_and_served_with_their_versions(
+    db: Database, object_store: MemoryObjectStore, client: TestClient
+):
+    run_id = db.run(_crawl, db, object_store, [NEWS, RELEASE])
+    # Same text, then new text: two versions from three snapshots.
+    db.run(_store_release, db, object_store, run_id, PAGES[RELEASE] + b"<!-- same -->")
+    changed = _html("Budget approved", "<h1>Budget approved</h1><p>The board amended it.</p>")
+    db.run(_store_release, db, object_store, run_id, changed)
+
+    page = client.get("/documents", params={"type": "press_releases"}).json()
+    assert page["total"] == 1
+    [summary] = page["items"]
+    assert (summary["url"], summary["title"]) == (RELEASE, "Budget approved")
+    assert client.get("/documents", params={"type": "projects"}).json()["total"] == 0
+    assert client.get("/documents", params={"since": "2999-01-01"}).json()["total"] == 0
+
+    document = client.get(f"/documents/{summary['id']}").json()
+    assert (document["institution_name"], document["parent"]) == ("CreateTO", None)
+    newest, oldest = document["versions"]
+    assert newest["created_at"] > oldest["created_at"]
+    assert newest["text_hash"] != oldest["text_hash"]
+    assert client.get(f"/documents/{uuid.uuid4()}").status_code == 404

@@ -886,6 +886,157 @@
         }
       }
     },
+    "/documents": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "List Documents",
+        "description": "Documents, newest dated first and undated last, by institution, type, or dated on or\nafter `since`.",
+        "operationId": "documents-list_documents",
+        "parameters": [
+          {
+            "name": "institution",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Institution"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/DocumentType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_DocumentOutput_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents/{document_id}": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Read Document",
+        "description": "The document with its parent document, if any, and its versions: the webpage's snapshots\nwith distinct text, newest first.",
+        "operationId": "documents-read_document",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ai-calls": {
       "get": {
         "tags": [
@@ -1393,6 +1544,97 @@
         "title": "CitationOutput",
         "description": "Where a value was read: a page (from 1) of a snapshot of `url`, and the excerpt. `verified`\nis the quote check's verdict."
       },
+      "DocumentDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "webpage_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Webpage Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "document_type": {
+            "$ref": "#/components/schemas/DocumentType"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "document_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Date"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "institution_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Institution Id"
+          },
+          "institution_name": {
+            "type": "string",
+            "title": "Institution Name"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentVersion"
+            },
+            "type": "array",
+            "title": "Versions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "webpage_id",
+          "url",
+          "document_type",
+          "title",
+          "document_date",
+          "created_at",
+          "institution_id",
+          "institution_name",
+          "parent",
+          "versions"
+        ],
+        "title": "DocumentDetail",
+        "description": "A document with its institution, its parent document if any, and its versions, newest\nfirst."
+      },
       "DocumentOutput": {
         "properties": {
           "id": {
@@ -1454,6 +1696,32 @@
         "title": "DocumentOutput",
         "description": "A document a run's classifications found."
       },
+      "DocumentRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "DocumentRef"
+      },
       "DocumentType": {
         "type": "string",
         "enum": [
@@ -1490,6 +1758,44 @@
           "count"
         ],
         "title": "DocumentTypeCount"
+      },
+      "DocumentVersion": {
+        "properties": {
+          "snapshot_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Snapshot Id"
+          },
+          "text_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Hash"
+          },
+          "media_type": {
+            "type": "string",
+            "title": "Media Type"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshot_id",
+          "text_hash",
+          "media_type",
+          "created_at"
+        ],
+        "title": "DocumentVersion",
+        "description": "A snapshot whose text differs from every earlier one's."
       },
       "FetchOutcome": {
         "type": "string",

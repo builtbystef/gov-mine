@@ -4,13 +4,14 @@ institution."""
 
 import logging
 import uuid
-from datetime import timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin, urlsplit
 
 from selectolax.lexbor import LexborHTMLParser
-from sqlalchemy import Select, func, select
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import Select, String, func, select
+from sqlalchemy.dialects.postgresql import distinct_on, insert
+from sqlalchemy.orm import aliased
 
 from gov_mine.integrations.ai import PROVIDER, jev
 from gov_mine.integrations.parser.html import HTML_MEDIA_TYPES
@@ -21,7 +22,7 @@ from gov_mine.modules.crawl import service as crawl
 from gov_mine.modules.crawl.models import Fetch, Webpage
 from gov_mine.modules.ingest import service as ingest
 from gov_mine.modules.ingest.models import TextStatus, WebpageSnapshot
-from gov_mine.modules.institutions.models import DocumentType
+from gov_mine.modules.institutions.models import DocumentType, Institution
 from gov_mine.modules.ledger import service as ledger
 from gov_mine.modules.ledger.models import AIPurpose
 from gov_mine.shared.exceptions import NotFoundError
@@ -435,6 +436,72 @@ async def list_run_documents(
     return [(document, url) for document, url in rows.tuples()], total
 
 
+async def list_documents(  # noqa: PLR0913 - the page and its three filters
+    session: AsyncSession,
+    *,
+    institution_id: uuid.UUID | None,
+    document_type: DocumentType | None,
+    since: date | None,
+    limit: int,
+    offset: int,
+) -> tuple[list[tuple[Document, str]], int]:
+    """Documents with their webpage's URL, newest dated first, undated last. `since` keeps
+    those dated on or after that day."""
+    where = []
+    if institution_id is not None:
+        where.append(Document.institution_id == institution_id)
+    if document_type is not None:
+        where.append(Document.document_type == document_type)
+    if since is not None:
+        where.append(Document.document_date >= datetime.combine(since, time(), UTC))
+    total = await session.scalar(select(func.count()).select_from(Document).where(*where)) or 0
+    rows = await session.execute(
+        select(Document, Webpage.url)
+        .join(Webpage, Webpage.id == Document.webpage_id)
+        .where(*where)
+        .order_by(
+            Document.document_date.desc().nulls_last(), Document.created_at.desc(), Document.id
+        )
+        .limit(limit)
+        .offset(offset)
+    )
+    return [(document, url) for document, url in rows], total
+
+
+async def read_document(
+    session: AsyncSession, document_id: uuid.UUID
+) -> tuple[Document, str, str, Document | None, list[WebpageSnapshot]]:
+    """The document, its URL, its institution's name, its parent document if any, and its
+    versions: the first snapshot of each distinct text, newest first (a snapshot without text
+    counts as its own)."""
+    parent = aliased(Document)
+    row = (
+        await session.execute(
+            select(Document, Webpage.url, Institution.name, parent)
+            .join(Webpage, Webpage.id == Document.webpage_id)
+            .join(Institution, Institution.id == Document.institution_id)
+            .outerjoin(parent, parent.id == Document.parent_document_id)
+            .where(Document.id == document_id)
+        )
+    ).one_or_none()
+    if row is None:
+        raise NotFoundError(f"Document {document_id} not found")
+    document, url, institution, parent_document = row
+    text = func.coalesce(WebpageSnapshot.text_hash, func.cast(WebpageSnapshot.id, String))
+    first = (
+        select(WebpageSnapshot.id)
+        .where(WebpageSnapshot.webpage_id == document.webpage_id)
+        .ext(distinct_on(text))
+        .order_by(text, WebpageSnapshot.created_at, WebpageSnapshot.id)
+    )
+    versions = await session.scalars(
+        select(WebpageSnapshot)
+        .where(WebpageSnapshot.id.in_(first))
+        .order_by(WebpageSnapshot.created_at.desc(), WebpageSnapshot.id.desc())
+    )
+    return document, url, institution, parent_document, list(versions)
+
+
 __all__ = [
     "CLASSIFIER",
     "CLASSIFY_TASK",
@@ -444,8 +511,10 @@ __all__ = [
     "count_run_documents",
     "crawl_interval",
     "criteria",
+    "list_documents",
     "list_run_documents",
     "list_run_sources",
     "queue_page",
+    "read_document",
     "read_html",
 ]
