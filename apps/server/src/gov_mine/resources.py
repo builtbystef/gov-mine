@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from gov_mine.config import Settings
 from gov_mine.db.session import create_engine
+from gov_mine.integrations.ai import jev
 from gov_mine.integrations.http import create_http_client
 from gov_mine.integrations.storage import ObjectStore, create_object_store
 from gov_mine.jobs import create_app
@@ -40,6 +41,8 @@ class Resources:
     jobs: App
     # The crawler's client for the websites it fetches.
     http: httpx.AsyncClient
+    # The client for model providers (OpenRouter's Decisions API).
+    models_http: httpx.AsyncClient
 
     def session(self) -> AsyncSession:
         """A new session. One per request or job run; commit explicitly."""
@@ -53,11 +56,12 @@ async def build_resources(
     object_store: ObjectStore | None = None,
     jobs_connector: BaseConnector | None = None,
     http: httpx.AsyncClient | None = None,
+    models_http: httpx.AsyncClient | None = None,
 ) -> AsyncGenerator[Resources]:
     """Open every resource from `settings` and close them on exit. The engine
     connects lazily; the object store and the job queue open their pools here.
-    Tests pass doubles: an in-memory store, an in-memory queue, and an HTTP
-    client over a mock transport."""
+    Tests pass doubles: an in-memory store, an in-memory queue, and HTTP
+    clients over mock transports."""
     engine = create_engine(settings)
     # Attributes stay readable after commit; async code cannot lazy-reload them.
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
@@ -69,6 +73,8 @@ async def build_resources(
         await stack.enter_async_context(jobs.open_async())
         if http is None:
             http = await stack.enter_async_context(create_http_client())
+        if models_http is None:
+            models_http = await stack.enter_async_context(jev.create_client())
         yield Resources(
             settings=settings,
             engine=engine,
@@ -76,6 +82,7 @@ async def build_resources(
             object_store=object_store,
             jobs=jobs,
             http=http,
+            models_http=models_http,
         )
 
 

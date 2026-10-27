@@ -157,6 +157,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/runs/{run_id}/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Run Sources
+         * @description The sources found by the run's classifications, next crawl first.
+         */
+        get: operations["runs-list_run_sources"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runs/{run_id}/document-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count Run Documents
+         * @description How many documents the run's classifications found, by type.
+         */
+        get: operations["runs-count_run_documents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai-calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Ai Calls
+         * @description The run's paid calls, by purpose, oldest first within each.
+         */
+        get: operations["ai-calls-list_ai_calls"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/": {
         parameters: {
             query?: never;
@@ -178,6 +238,61 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AICallOutput
+         * @description One paid call. `cost` is from the price list; `reported_cost` is what OpenRouter said.
+         */
+        AICallOutput: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Crawl Run Id */
+            crawl_run_id: string | null;
+            /** Classification Id */
+            classification_id: string | null;
+            /** Extraction Id */
+            extraction_id: string | null;
+            purpose: components["schemas"]["AIPurpose"];
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Input Tokens */
+            input_tokens: number;
+            /** Output Tokens */
+            output_tokens: number;
+            /** Cost */
+            cost: string;
+            /** Reported Cost */
+            reported_cost: string | null;
+            /** Price List Version */
+            price_list_version: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * AIPurpose
+         * @enum {string}
+         */
+        AIPurpose: "classify" | "extract" | "ocr" | "transcribe";
+        /**
+         * DocumentType
+         * @description What a source lists and what a document is. A `project_material` is assigned by a
+         *     project's extraction, never by the classifier.
+         * @enum {string}
+         */
+        DocumentType: "purchase_order" | "meeting_minutes" | "budget" | "procurement_guidelines" | "youtube" | "rfp" | "grants" | "press_releases" | "projects" | "project_material" | "annual_report" | "strategic_plan" | "staff_directory";
+        /** DocumentTypeCount */
+        DocumentTypeCount: {
+            document_type: components["schemas"]["DocumentType"];
+            /** Count */
+            count: number;
+        };
         /**
          * FetchOutcome
          * @enum {string}
@@ -224,6 +339,17 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** Page[AICallOutput] */
+        Page_AICallOutput_: {
+            /** Items */
+            items: components["schemas"]["AICallOutput"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
         /** Page[FetchOutput] */
         Page_FetchOutput_: {
             /** Items */
@@ -239,6 +365,17 @@ export interface components {
         Page_RunOutput_: {
             /** Items */
             items: components["schemas"]["RunOutput"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[SourceOutput] */
+        Page_SourceOutput_: {
+            /** Items */
+            items: components["schemas"]["SourceOutput"][];
             /** Total */
             total: number;
             /** Limit */
@@ -313,6 +450,35 @@ export interface components {
             /** Size Bytes */
             size_bytes: number;
         };
+        /**
+         * SourceOutput
+         * @description A listing page the run found, revisited every `crawl_interval`.
+         */
+        SourceOutput: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Webpage Id
+             * Format: uuid
+             */
+            webpage_id: string;
+            /** Url */
+            url: string;
+            document_type: components["schemas"]["DocumentType"];
+            /**
+             * Crawl Interval
+             * Format: duration
+             */
+            crawl_interval: string;
+            /**
+             * Next Crawl At
+             * Format: date-time
+             */
+            next_crawl_at: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -333,16 +499,23 @@ export interface components {
     headers: never;
     pathItems: never;
 }
+export type AiCallOutput = components['schemas']['AICallOutput'];
+export type AiPurpose = components['schemas']['AIPurpose'];
+export type DocumentType = components['schemas']['DocumentType'];
+export type DocumentTypeCount = components['schemas']['DocumentTypeCount'];
 export type FetchOutcome = components['schemas']['FetchOutcome'];
 export type FetchOutput = components['schemas']['FetchOutput'];
 export type HttpValidationError = components['schemas']['HTTPValidationError'];
 export type Health = components['schemas']['Health'];
+export type PageAiCallOutput = components['schemas']['Page_AICallOutput_'];
 export type PageFetchOutput = components['schemas']['Page_FetchOutput_'];
 export type PageRunOutput = components['schemas']['Page_RunOutput_'];
+export type PageSourceOutput = components['schemas']['Page_SourceOutput_'];
 export type RunOutput = components['schemas']['RunOutput'];
 export type RunSettings = components['schemas']['RunSettings'];
 export type RunStatus = components['schemas']['RunStatus'];
 export type SnapshotSummary = components['schemas']['SnapshotSummary'];
+export type SourceOutput = components['schemas']['SourceOutput'];
 export type ValidationError = components['schemas']['ValidationError'];
 export type $defs = Record<string, never>;
 export interface operations {
@@ -553,6 +726,104 @@ export interface operations {
                 };
                 content: {
                     "application/octet-stream": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    "runs-list_run_sources": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_SourceOutput_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    "runs-count_run_documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentTypeCount"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    "ai-calls-list_ai_calls": {
+        parameters: {
+            query: {
+                run: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_AICallOutput_"];
                 };
             };
             /** @description Validation Error */

@@ -23,6 +23,25 @@ class InstitutionType(StrEnum):
     MUNICIPAL_AGENCY = "municipal_agency"
 
 
+class DocumentType(StrEnum):
+    """What a source lists and what a document is. A `project_material` is assigned by a
+    project's extraction, never by the classifier."""
+
+    PURCHASE_ORDER = "purchase_order"
+    MEETING_MINUTES = "meeting_minutes"
+    BUDGET = "budget"
+    PROCUREMENT_GUIDELINES = "procurement_guidelines"
+    YOUTUBE = "youtube"
+    RFP = "rfp"
+    GRANTS = "grants"
+    PRESS_RELEASES = "press_releases"
+    PROJECTS = "projects"
+    PROJECT_MATERIAL = "project_material"
+    ANNUAL_REPORT = "annual_report"
+    STRATEGIC_PLAN = "strategic_plan"
+    STAFF_DIRECTORY = "staff_directory"
+
+
 class Institution(UUIDPrimaryKey, CreatedAt, Base):
     """A public body and its website. `website_url` is the trusted starting point and the
     crawl's scope prefix; the location columns are for display only."""

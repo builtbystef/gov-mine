@@ -328,6 +328,188 @@
         }
       }
     },
+    "/runs/{run_id}/sources": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "List Run Sources",
+        "description": "The sources found by the run's classifications, next crawl first.",
+        "operationId": "runs-list_run_sources",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SourceOutput_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{run_id}/document-counts": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Count Run Documents",
+        "description": "How many documents the run's classifications found, by type.",
+        "operationId": "runs-count_run_documents",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentTypeCount"
+                  },
+                  "title": "Response Runs-Count Run Documents"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai-calls": {
+      "get": {
+        "tags": [
+          "ai-calls"
+        ],
+        "summary": "List Ai Calls",
+        "description": "The run's paid calls, by purpose, oldest first within each.",
+        "operationId": "ai-calls-list_ai_calls",
+        "parameters": [
+          {
+            "name": "run",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AICallOutput_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "summary": "Read Root",
@@ -353,6 +535,159 @@
   },
   "components": {
     "schemas": {
+      "AICallOutput": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "crawl_run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crawl Run Id"
+          },
+          "classification_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Classification Id"
+          },
+          "extraction_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction Id"
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/AIPurpose"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          },
+          "cost": {
+            "type": "string",
+            "title": "Cost"
+          },
+          "reported_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Cost"
+          },
+          "price_list_version": {
+            "type": "string",
+            "title": "Price List Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "crawl_run_id",
+          "classification_id",
+          "extraction_id",
+          "purpose",
+          "provider",
+          "model",
+          "input_tokens",
+          "output_tokens",
+          "cost",
+          "reported_cost",
+          "price_list_version",
+          "created_at"
+        ],
+        "title": "AICallOutput",
+        "description": "One paid call. `cost` is from the price list; `reported_cost` is what OpenRouter said."
+      },
+      "AIPurpose": {
+        "type": "string",
+        "enum": [
+          "classify",
+          "extract",
+          "ocr",
+          "transcribe"
+        ],
+        "title": "AIPurpose"
+      },
+      "DocumentType": {
+        "type": "string",
+        "enum": [
+          "purchase_order",
+          "meeting_minutes",
+          "budget",
+          "procurement_guidelines",
+          "youtube",
+          "rfp",
+          "grants",
+          "press_releases",
+          "projects",
+          "project_material",
+          "annual_report",
+          "strategic_plan",
+          "staff_directory"
+        ],
+        "title": "DocumentType",
+        "description": "What a source lists and what a document is. A `project_material` is assigned by a\nproject's extraction, never by the classifier."
+      },
+      "DocumentTypeCount": {
+        "properties": {
+          "document_type": {
+            "$ref": "#/components/schemas/DocumentType"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_type",
+          "count"
+        ],
+        "title": "DocumentTypeCount"
+      },
       "FetchOutcome": {
         "type": "string",
         "enum": [
@@ -478,6 +813,37 @@
         ],
         "title": "Health"
       },
+      "Page_AICallOutput_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AICallOutput"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[AICallOutput]"
+      },
       "Page_FetchOutput_": {
         "properties": {
           "items": {
@@ -539,6 +905,37 @@
           "offset"
         ],
         "title": "Page[RunOutput]"
+      },
+      "Page_SourceOutput_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SourceOutput"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[SourceOutput]"
       },
       "RunOutput": {
         "properties": {
@@ -706,6 +1103,48 @@
           "size_bytes"
         ],
         "title": "SnapshotSummary"
+      },
+      "SourceOutput": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "webpage_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Webpage Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "document_type": {
+            "$ref": "#/components/schemas/DocumentType"
+          },
+          "crawl_interval": {
+            "type": "string",
+            "format": "duration",
+            "title": "Crawl Interval"
+          },
+          "next_crawl_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Next Crawl At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "webpage_id",
+          "url",
+          "document_type",
+          "crawl_interval",
+          "next_crawl_at"
+        ],
+        "title": "SourceOutput",
+        "description": "A listing page the run found, revisited every `crawl_interval`."
       },
       "ValidationError": {
         "properties": {

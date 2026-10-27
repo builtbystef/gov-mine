@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 # listed here; the tasks in this package are about the platform.
 TASK_MODULES = [
     "gov_mine.jobs.stalled",
+    "gov_mine.modules.classify.jobs",
     "gov_mine.modules.crawl.jobs",
     "gov_mine.modules.ingest.jobs",
 ]

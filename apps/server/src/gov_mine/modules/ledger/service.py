@@ -1,6 +1,8 @@
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+from sqlalchemy import func, select
+
 from gov_mine.modules.ledger.models import AICall, AIPurpose
 from gov_mine.modules.ledger.prices import PRICE_LIST_VERSION, PRICES, Price
 from gov_mine.shared.exceptions import AppError
@@ -66,3 +68,19 @@ async def record(  # noqa: PLR0913 - the spec's ledger.record, keyword-only
     session.add(call)
     await session.flush()
     return call.id
+
+
+async def list_calls(
+    session: AsyncSession, run_id: uuid.UUID, *, limit: int, offset: int
+) -> tuple[list[AICall], int]:
+    """The run's calls by purpose, oldest first within each."""
+    where = AICall.crawl_run_id == run_id
+    total = await session.scalar(select(func.count()).select_from(AICall).where(where)) or 0
+    calls = await session.scalars(
+        select(AICall)
+        .where(where)
+        .order_by(AICall.purpose, AICall.created_at, AICall.id)
+        .limit(limit)
+        .offset(offset)
+    )
+    return list(calls), total
