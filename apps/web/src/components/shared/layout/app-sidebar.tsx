@@ -1,4 +1,4 @@
-import { ActivityIcon } from "lucide-react";
+import { ActivityIcon, LandmarkIcon } from "lucide-react";
 import Link from "next/link";
 
 import { Logo, Wordmark } from "@/components/shared/logo";
@@ -31,6 +31,12 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton tooltip="Institutions" render={<Link href="/institutions" />}>
+                  <LandmarkIcon />
+                  <span>Institutions</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton tooltip="Runs" render={<Link href="/runs" />}>
                   <ActivityIcon />

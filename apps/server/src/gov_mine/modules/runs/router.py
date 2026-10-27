@@ -1,10 +1,10 @@
 import uuid
 
-from fastapi import APIRouter
+from fastapi import APIRouter, status
 
 from gov_mine.dependencies import SessionDep
 from gov_mine.modules.runs import service
-from gov_mine.modules.runs.schemas import FetchOutput, RunOutput
+from gov_mine.modules.runs.schemas import FetchOutput, RunCreate, RunOutput
 from gov_mine.shared.pagination import Limit, Offset, Page
 
 router = APIRouter(prefix="/runs", tags=["runs"])
@@ -15,6 +15,17 @@ async def list_runs(session: SessionDep, limit: Limit = 50, offset: Offset = 0) 
     """Every run, newest first."""
     items, total = await service.list_runs(session, limit=limit, offset=offset)
     return Page(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
+async def create_run(data: RunCreate, session: SessionDep) -> RunOutput:
+    """Queues a full run of the institution from the dashboard. 409 while it has a queued or
+    running run."""
+    run = await service.create_run(
+        session, data.institution_id, trigger="dashboard", mode=data.mode
+    )
+    await session.commit()
+    return await service.read_run(session, run.id)
 
 
 @router.get("/{run_id}")

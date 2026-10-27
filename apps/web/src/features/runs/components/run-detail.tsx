@@ -7,9 +7,10 @@ import { PageHeader } from "@/components/shared/layout/page-header";
 import { browserApi } from "@/lib/api/client";
 import { formatDateTime } from "@/lib/formatting/dates";
 
-import { runQuery } from "../queries";
+import { isActive, runQuery } from "../queries";
 import type { PageSearch } from "../schemas";
 import { FetchesTable } from "./fetches-table";
+import { RunCounts } from "./run-counts";
 import { RunStatusBadge } from "./status-badges";
 
 /** A run: what it was asked to do, where it stands, and its fetch log. */
@@ -35,6 +36,9 @@ export function RunDetail({
         }
         description={`Run ${run.id}`}
       />
+      <div className="mb-6">
+        <RunCounts run={run} />
+      </div>
       <dl className="mb-8 grid gap-3 text-sm md:grid-cols-2">
         <Detail label="Trigger">{run.settings.trigger}</Detail>
         <Detail label="Mode">{run.settings.mode}</Detail>
@@ -45,7 +49,12 @@ export function RunDetail({
       </dl>
       <section className="flex flex-col gap-4">
         <h3 className="text-lg font-semibold">Fetches</h3>
-        <FetchesTable runId={run.id} initialFilters={fetchFilters} timeZone={timeZone} />
+        <FetchesTable
+          runId={run.id}
+          initialFilters={fetchFilters}
+          timeZone={timeZone}
+          live={isActive(run.status)}
+        />
       </section>
     </>
   );

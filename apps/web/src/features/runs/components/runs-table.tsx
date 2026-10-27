@@ -9,6 +9,7 @@ import { createDataTableColumnHelper, DataTable } from "@/components/shared/data
 import { useUrlFilters } from "@/hooks/use-url-filters";
 import { browserApi } from "@/lib/api/client";
 import { formatDateTime } from "@/lib/formatting/dates";
+import { formatCost, formatDuration } from "@/lib/formatting/numbers";
 import { paged } from "@/lib/lists";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +18,29 @@ import { parsePageSearch, type PageSearch } from "../schemas";
 import { RunStatusBadge } from "./status-badges";
 
 const column = createDataTableColumnHelper<RunOutput>();
+
+type CountKey = Exclude<keyof RunOutput["counts"], "cost">;
+
+function countColumn(key: CountKey, header: string) {
+  return column.display({
+    id: key,
+    header: () => <span className="block text-right">{header}</span>,
+    cell: ({ row }) => {
+      const value = row.original.counts[key];
+      return (
+        <span
+          className={cn(
+            "block text-right tabular-nums",
+            value === 0 && "text-muted-foreground",
+            key === "failed" && value > 0 && "font-medium text-destructive",
+          )}
+        >
+          {value}
+        </span>
+      );
+    },
+  });
+}
 
 function runColumns(timeZone: string) {
   return column.columns([
@@ -45,11 +69,26 @@ function runColumns(timeZone: string) {
         </span>
       ),
     }),
-    column.accessor("finished_at", {
-      header: "Finished",
+    column.accessor("elapsed_seconds", {
+      header: "Elapsed",
       cell: ({ row }) => (
-        <span className="whitespace-nowrap">
-          {formatDateTime(row.original.finished_at, timeZone)}
+        <span className="whitespace-nowrap tabular-nums">
+          {formatDuration(row.original.elapsed_seconds)}
+        </span>
+      ),
+    }),
+    countColumn("fetched", "Fetched"),
+    countColumn("not_modified", "Not modified"),
+    countColumn("skipped", "Skipped"),
+    countColumn("blocked", "Blocked"),
+    countColumn("failed", "Failed"),
+    countColumn("snapshots", "Snapshots"),
+    column.display({
+      id: "cost",
+      header: () => <span className="block text-right">Cost</span>,
+      cell: ({ row }) => (
+        <span className="block text-right tabular-nums">
+          {formatCost(row.original.counts.cost)}
         </span>
       ),
     }),
@@ -78,7 +117,7 @@ export function RunsTable({
       total={runs.total}
       page={page}
       onPageChange={setPage}
-      emptyMessage="No runs yet. Start one with `gov-mine run create <institution id> --full`."
+      emptyMessage="No runs yet. Start one from Institutions."
       className={cn(isStale && "opacity-60 transition-opacity")}
     />
   );

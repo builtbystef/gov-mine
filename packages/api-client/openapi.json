@@ -71,6 +71,198 @@
         }
       }
     },
+    "/institutions": {
+      "get": {
+        "tags": [
+          "institutions"
+        ],
+        "summary": "List Institutions",
+        "description": "Every institution, by name, with its last run and when the next is due.",
+        "operationId": "institutions-list_institutions",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_InstitutionOutput_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "institutions"
+        ],
+        "summary": "Create Institution",
+        "description": "Adds the institution and makes its website's host a `crawl` domain.",
+        "operationId": "institutions-create_institution",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstitutionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstitutionOutput"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/institutions/{institution_id}": {
+      "get": {
+        "tags": [
+          "institutions"
+        ],
+        "summary": "Read Institution",
+        "operationId": "institutions-read_institution",
+        "parameters": [
+          {
+            "name": "institution_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Institution Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstitutionOutput"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "institutions"
+        ],
+        "summary": "Update Institution",
+        "description": "Replaces the institution's fields; its website's host becomes a `crawl` domain.",
+        "operationId": "institutions-update_institution",
+        "parameters": [
+          {
+            "name": "institution_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Institution Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstitutionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstitutionOutput"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/runs": {
       "get": {
         "tags": [
@@ -111,6 +303,46 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Page_RunOutput_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Create Run",
+        "description": "Queues a full run of the institution from the dashboard. 409 while it has a queued or\nrunning run.",
+        "operationId": "runs-create_run",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOutput"
                 }
               }
             }
@@ -813,6 +1045,210 @@
         ],
         "title": "Health"
       },
+      "InstitutionInput": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "institution_type": {
+            "$ref": "#/components/schemas/InstitutionType"
+          },
+          "website_url": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 1,
+            "format": "uri",
+            "title": "Website Url"
+          },
+          "country_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2,
+                "minLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country Code"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "institution_type",
+          "website_url"
+        ],
+        "title": "InstitutionInput",
+        "description": "What the Add and Edit forms send. The website must be http or https."
+      },
+      "InstitutionOutput": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "institution_type": {
+            "$ref": "#/components/schemas/InstitutionType"
+          },
+          "website_url": {
+            "type": "string",
+            "title": "Website Url"
+          },
+          "country_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country Code"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "paused": {
+            "type": "boolean",
+            "title": "Paused"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LastRun"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "institution_type",
+          "website_url",
+          "country_code",
+          "state",
+          "city",
+          "paused",
+          "created_at",
+          "last_run",
+          "next_run_at"
+        ],
+        "title": "InstitutionOutput"
+      },
+      "InstitutionType": {
+        "type": "string",
+        "enum": [
+          "state",
+          "state_agency",
+          "county",
+          "city",
+          "police_agency",
+          "fire_department",
+          "special_district",
+          "k12_district",
+          "higher_education",
+          "municipal_agency"
+        ],
+        "title": "InstitutionType"
+      },
+      "LastRun": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "created_at"
+        ],
+        "title": "LastRun"
+      },
       "Page_AICallOutput_": {
         "properties": {
           "items": {
@@ -874,6 +1310,37 @@
           "offset"
         ],
         "title": "Page[FetchOutput]"
+      },
+      "Page_InstitutionOutput_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InstitutionOutput"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[InstitutionOutput]"
       },
       "Page_RunOutput_": {
         "properties": {
@@ -937,6 +1404,71 @@
         ],
         "title": "Page[SourceOutput]"
       },
+      "RunCounts": {
+        "properties": {
+          "fetched": {
+            "type": "integer",
+            "title": "Fetched"
+          },
+          "not_modified": {
+            "type": "integer",
+            "title": "Not Modified"
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped"
+          },
+          "blocked": {
+            "type": "integer",
+            "title": "Blocked"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "snapshots": {
+            "type": "integer",
+            "title": "Snapshots"
+          },
+          "cost": {
+            "type": "string",
+            "title": "Cost"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fetched",
+          "not_modified",
+          "skipped",
+          "blocked",
+          "failed",
+          "snapshots",
+          "cost"
+        ],
+        "title": "RunCounts",
+        "description": "What the run's fetch log and ledger say so far. `skipped` is every `skipped_*` outcome,\n`failed` every `failed_*`, `not_modified` includes `unchanged`."
+      },
+      "RunCreate": {
+        "properties": {
+          "institution_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Institution Id"
+          },
+          "mode": {
+            "type": "string",
+            "const": "full",
+            "title": "Mode",
+            "default": "full"
+          }
+        },
+        "type": "object",
+        "required": [
+          "institution_id"
+        ],
+        "title": "RunCreate",
+        "description": "A run started from the dashboard; only full runs exist until sources do."
+      },
       "RunOutput": {
         "properties": {
           "id": {
@@ -998,6 +1530,20 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "elapsed_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elapsed Seconds"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/RunCounts"
           }
         },
         "type": "object",
@@ -1010,7 +1556,9 @@
           "started_at",
           "finished_at",
           "error",
-          "created_at"
+          "created_at",
+          "elapsed_seconds",
+          "counts"
         ],
         "title": "RunOutput"
       },

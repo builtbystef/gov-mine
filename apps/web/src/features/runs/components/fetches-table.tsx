@@ -68,17 +68,21 @@ export function FetchesTable({
   runId,
   initialFilters,
   timeZone,
+  live,
 }: {
   runId: string;
   initialFilters: PageSearch;
   timeZone: string;
+  live: boolean;
 }) {
   const [page, setPage] = useState(initialFilters.page ?? 1);
   const { deferred, isStale } = useUrlFilters(
     { page: page > 1 ? page : undefined },
     parsePageSearch,
   );
-  const { data: fetches } = useSuspenseQuery(runFetchesQuery(browserApi, runId, paged(deferred)));
+  const { data: fetches } = useSuspenseQuery(
+    runFetchesQuery(browserApi, runId, paged(deferred), live),
+  );
 
   return (
     <DataTable<FetchOutput>

@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel
@@ -24,6 +25,26 @@ class RunSettings(BaseModel):
     extractors: dict[str, str] | None = None
 
 
+class RunCreate(BaseModel):
+    """A run started from the dashboard; only full runs exist until sources do."""
+
+    institution_id: uuid.UUID
+    mode: Literal["full"] = "full"
+
+
+class RunCounts(BaseModel):
+    """What the run's fetch log and ledger say so far. `skipped` is every `skipped_*` outcome,
+    `failed` every `failed_*`, `not_modified` includes `unchanged`."""
+
+    fetched: int
+    not_modified: int
+    skipped: int
+    blocked: int
+    failed: int
+    snapshots: int
+    cost: Decimal
+
+
 class RunOutput(BaseModel):
     id: uuid.UUID
     institution_id: uuid.UUID
@@ -34,6 +55,9 @@ class RunOutput(BaseModel):
     finished_at: datetime | None
     error: str | None
     created_at: datetime
+    # From start to finish, or to now while it runs; None before it starts.
+    elapsed_seconds: float | None
+    counts: RunCounts
 
 
 class SnapshotSummary(BaseModel):

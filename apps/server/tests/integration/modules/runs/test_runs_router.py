@@ -146,3 +146,19 @@ def test_an_unknown_run_is_404(client: TestClient, db: Database):  # noqa: ARG00
 
 def test_a_page_larger_than_500_is_refused(client: TestClient):
     assert client.get("/runs", params={"limit": 501}).status_code == 422
+
+
+def test_a_runs_counts_come_from_its_fetch_log(client: TestClient, db: Database):
+    ids = db.run(_seed_runs, db)
+
+    counts = client.get(f"/runs/{ids['newer']}").json()["counts"]
+
+    assert counts == {
+        "fetched": 1,
+        "not_modified": 0,
+        "skipped": 1,
+        "blocked": 0,
+        "failed": 0,
+        "snapshots": 1,
+        "cost": "0",
+    }

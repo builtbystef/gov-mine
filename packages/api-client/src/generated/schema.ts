@@ -59,6 +59,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/institutions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Institutions
+         * @description Every institution, by name, with its last run and when the next is due.
+         */
+        get: operations["institutions-list_institutions"];
+        put?: never;
+        /**
+         * Create Institution
+         * @description Adds the institution and makes its website's host a `crawl` domain.
+         */
+        post: operations["institutions-create_institution"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/institutions/{institution_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Institution */
+        get: operations["institutions-read_institution"];
+        /**
+         * Update Institution
+         * @description Replaces the institution's fields; its website's host becomes a `crawl` domain.
+         */
+        put: operations["institutions-update_institution"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/runs": {
         parameters: {
             query?: never;
@@ -72,7 +117,12 @@ export interface paths {
          */
         get: operations["runs-list_runs"];
         put?: never;
-        post?: never;
+        /**
+         * Create Run
+         * @description Queues a full run of the institution from the dashboard. 409 while it has a queued or
+         *     running run.
+         */
+        post: operations["runs-create_run"];
         delete?: never;
         options?: never;
         head?: never;
@@ -339,6 +389,74 @@ export interface components {
             /** Status */
             status: string;
         };
+        /**
+         * InstitutionInput
+         * @description What the Add and Edit forms send. The website must be http or https.
+         */
+        InstitutionInput: {
+            /** Name */
+            name: string;
+            institution_type: components["schemas"]["InstitutionType"];
+            /**
+             * Website Url
+             * Format: uri
+             */
+            website_url: string;
+            /** Country Code */
+            country_code?: string | null;
+            /** State */
+            state?: string | null;
+            /** City */
+            city?: string | null;
+        };
+        /** InstitutionOutput */
+        InstitutionOutput: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            institution_type: components["schemas"]["InstitutionType"];
+            /** Website Url */
+            website_url: string;
+            /** Country Code */
+            country_code: string | null;
+            /** State */
+            state: string | null;
+            /** City */
+            city: string | null;
+            /** Paused */
+            paused: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            last_run: components["schemas"]["LastRun"] | null;
+            /** Next Run At */
+            next_run_at: string | null;
+        };
+        /**
+         * InstitutionType
+         * @enum {string}
+         */
+        InstitutionType: "state" | "state_agency" | "county" | "city" | "police_agency" | "fire_department" | "special_district" | "k12_district" | "higher_education" | "municipal_agency";
+        /** LastRun */
+        LastRun: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            status: components["schemas"]["RunStatus"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** Page[AICallOutput] */
         Page_AICallOutput_: {
             /** Items */
@@ -354,6 +472,17 @@ export interface components {
         Page_FetchOutput_: {
             /** Items */
             items: components["schemas"]["FetchOutput"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[InstitutionOutput] */
+        Page_InstitutionOutput_: {
+            /** Items */
+            items: components["schemas"]["InstitutionOutput"][];
             /** Total */
             total: number;
             /** Limit */
@@ -383,6 +512,44 @@ export interface components {
             /** Offset */
             offset: number;
         };
+        /**
+         * RunCounts
+         * @description What the run's fetch log and ledger say so far. `skipped` is every `skipped_*` outcome,
+         *     `failed` every `failed_*`, `not_modified` includes `unchanged`.
+         */
+        RunCounts: {
+            /** Fetched */
+            fetched: number;
+            /** Not Modified */
+            not_modified: number;
+            /** Skipped */
+            skipped: number;
+            /** Blocked */
+            blocked: number;
+            /** Failed */
+            failed: number;
+            /** Snapshots */
+            snapshots: number;
+            /** Cost */
+            cost: string;
+        };
+        /**
+         * RunCreate
+         * @description A run started from the dashboard; only full runs exist until sources do.
+         */
+        RunCreate: {
+            /**
+             * Institution Id
+             * Format: uuid
+             */
+            institution_id: string;
+            /**
+             * Mode
+             * @default full
+             * @constant
+             */
+            mode: "full";
+        };
         /** RunOutput */
         RunOutput: {
             /**
@@ -410,6 +577,9 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Elapsed Seconds */
+            elapsed_seconds: number | null;
+            counts: components["schemas"]["RunCounts"];
         };
         /**
          * RunSettings
@@ -511,10 +681,17 @@ export type FetchOutcome = components['schemas']['FetchOutcome'];
 export type FetchOutput = components['schemas']['FetchOutput'];
 export type HttpValidationError = components['schemas']['HTTPValidationError'];
 export type Health = components['schemas']['Health'];
+export type InstitutionInput = components['schemas']['InstitutionInput'];
+export type InstitutionOutput = components['schemas']['InstitutionOutput'];
+export type InstitutionType = components['schemas']['InstitutionType'];
+export type LastRun = components['schemas']['LastRun'];
 export type PageAiCallOutput = components['schemas']['Page_AICallOutput_'];
 export type PageFetchOutput = components['schemas']['Page_FetchOutput_'];
+export type PageInstitutionOutput = components['schemas']['Page_InstitutionOutput_'];
 export type PageRunOutput = components['schemas']['Page_RunOutput_'];
 export type PageSourceOutput = components['schemas']['Page_SourceOutput_'];
+export type RunCounts = components['schemas']['RunCounts'];
+export type RunCreate = components['schemas']['RunCreate'];
 export type RunOutput = components['schemas']['RunOutput'];
 export type RunSettings = components['schemas']['RunSettings'];
 export type RunStatus = components['schemas']['RunStatus'];
@@ -583,6 +760,137 @@ export interface operations {
             };
         };
     };
+    "institutions-list_institutions": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_InstitutionOutput_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    "institutions-create_institution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstitutionInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstitutionOutput"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    "institutions-read_institution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                institution_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstitutionOutput"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    "institutions-update_institution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                institution_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstitutionInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstitutionOutput"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     "runs-list_runs": {
         parameters: {
             query?: {
@@ -602,6 +910,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_RunOutput_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    "runs-create_run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOutput"];
                 };
             };
             /** @description Validation Error */

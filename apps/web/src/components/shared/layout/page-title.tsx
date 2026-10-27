@@ -13,10 +13,17 @@ export function PageTitle() {
 }
 
 export function titleFor(pathname: string): string | null {
-  const [section, id] = pathname.split("/").filter(Boolean);
+  const [section, id, action] = pathname.split("/").filter(Boolean);
   switch (section) {
     case undefined:
       return "Home";
+    case "institutions":
+      if (id === undefined) return "Institutions";
+      return id === "new"
+        ? "Add institution"
+        : action === "edit"
+          ? "Edit institution"
+          : "Institution";
     case "runs":
       return id === undefined ? "Runs" : "Run";
     default:
