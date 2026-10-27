@@ -44,7 +44,7 @@ from gov_mine.shared.logs import ContextFilter, JsonFormatter
 from gov_mine.shared.urls import normalise_url
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import AsyncIterator, Callable, Iterator
 
     from sqlalchemy.engine import URL, Engine
 
@@ -146,8 +146,9 @@ class Span:
 class Website:
     """Serves `pages` (URL to body; a `.pdf` as a PDF, an `.xml` as XML, a `.txt` as text, the
     rest as HTML, unless `media_types` says otherwise), the status in `statuses` for a URL listed
-    there, and 404 for the rest, taking `holds[url]` seconds to answer when listed there. Notes
-    the run's status, the `User-Agent` and when each request arrived and was answered."""
+    there, what `responses[url]()` makes for a URL listed there, and 404 for the rest, taking
+    `holds[url]` seconds to answer when listed there. Notes the run's status, the method, the
+    `User-Agent` and when each request arrived and was answered."""
 
     def __init__(
         self,
@@ -155,12 +156,15 @@ class Website:
         media_types: dict[str, str] | None = None,
         statuses: dict[str, int] | None = None,
         holds: dict[str, float] | None = None,
+        responses: dict[str, Callable[[], httpx.Response]] | None = None,
     ) -> None:
         self.pages = pages if pages is not None else {"https://createto.ca/": HOMEPAGE}
         self.media_types = media_types or {}
         self.statuses = statuses or {}
         self.holds = holds or {}
+        self.responses = responses or {}
         self.requests: list[str] = []
+        self.methods: list[str] = []
         self.spans: list[Span] = []
         self.user_agents: list[str | None] = []
         self.status_during_fetch: list[str] = []
@@ -179,12 +183,15 @@ class Website:
     async def answer(self, request: httpx.Request) -> httpx.Response:
         url = str(request.url)
         self.requests.append(url)
+        self.methods.append(request.method)
         self.user_agents.append(request.headers.get("User-Agent"))
         async with self.session_factory() as session:
             statuses = await session.scalars(text("SELECT status FROM crawl_runs"))
             self.status_during_fetch.extend(statuses)
         if url in self.statuses:
             return httpx.Response(self.statuses[url])
+        if url in self.responses:
+            return self.responses[url]()
         if url not in self.pages:
             return httpx.Response(404)
         media_type = self.media_types.get(url) or {
@@ -328,7 +335,13 @@ def test_a_full_run_crawls_the_homepage_into_a_snapshot(crawl_settings: Settings
     run_id = output.strip()
     (run,) = rows(database, "SELECT * FROM crawl_runs WHERE id = :id", id=run_id)
     assert run["status"] == "queued"
-    assert run["settings"] == {"trigger": "cli", "mode": "full", "limit": 1}
+    # The fence's size cap is recorded: 100 MB.
+    assert run["settings"] == {
+        "trigger": "cli",
+        "mode": "full",
+        "limit": 1,
+        "max_file_bytes": 100 * 1024 * 1024,
+    }
     assert run["institution_id"] == institution["id"]
     queued = rows(database, "SELECT task_name, args FROM procrastinate_jobs")
     assert [(job["task_name"], job["args"]["run_id"]) for job in queued] == [
@@ -387,6 +400,7 @@ def test_a_full_run_crawls_the_homepage_into_a_snapshot(crawl_settings: Settings
     assert (runs["total"], runs["limit"], runs["offset"]) == (1, 50, 0)
     assert runs["items"][0]["id"] == run_id
     assert runs["items"][0]["status"] == "finished"
+    assert runs["items"][0]["settings"]["max_file_bytes"] == 100 * 1024 * 1024
     assert fetches["total"] == 1
     (item,) = fetches["items"]
     assert item["outcome"] == "fetched"
@@ -567,7 +581,12 @@ def test_run_create_limit_caps_the_requests_the_run_sends(
 ):
     run_id = create_run("--limit", "3")
     (run,) = rows(database, "SELECT settings FROM crawl_runs")
-    assert run["settings"] == {"trigger": "cli", "mode": "full", "limit": 3}
+    assert run["settings"] == {
+        "trigger": "cli",
+        "mode": "full",
+        "limit": 3,
+        "max_file_bytes": 100 * 1024 * 1024,
+    }
     pages = {f"{SITE}/": page("https://elsewhere.example/", *(f"/p/{n}" for n in range(10)))}
     pages |= {f"{SITE}/p/{n}": page(*(f"/p/{n}/{m}" for m in range(10))) for n in range(10)}
     website = Website(pages)
@@ -1057,3 +1076,152 @@ def test_a_host_is_sent_one_request_at_a_time_its_delay_apart_alongside_other_ho
         "www.merx.com": 5000,
     }
     assert domains["createto.ca"]["last_request_at"] == sent[-1]
+
+
+# Every type the crawler downloads, as the extension of a link and as the `Content-Type` of a
+# link without one.
+SUPPORTED_TYPES = {
+    "pdf": "application/pdf",
+    "doc": "application/msword",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "xls": "application/vnd.ms-excel",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "ppt": "application/vnd.ms-powerpoint",
+    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "csv": "text/csv",
+    "txt": "text/plain",
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "gif": "image/gif",
+    "svg": "image/svg+xml",
+    "webp": "image/webp",
+}
+
+
+def test_every_supported_type_is_fetched_with_one_get_and_unsupported_extensions_are_not(
+    crawl_settings: Settings, database: Engine
+):
+    run_id = create_run()
+    by_extension = {f"{SITE}/files/sample.{ext}": media for ext, media in SUPPORTED_TYPES.items()}
+    by_header = {f"{SITE}/download/{ext}": media for ext, media in SUPPORTED_TYPES.items()}
+    # On a files_only host too, where only what looks like a file is fetched.
+    on_storyblok = {f"{STORYBLOK}/sample.{ext}": media for ext, media in SUPPORTED_TYPES.items()}
+    supported = by_extension | by_header | on_storyblok
+    unsupported = [f"{SITE}/files/archive.zip", f"{SITE}/files/setup.exe"]
+    website = Website(
+        {
+            f"{SITE}/": page(*supported, *unsupported),
+            **{url: f"{url} bytes".encode() for url in supported},
+            **dict.fromkeys(unsupported, b"PK"),
+        },
+        media_types=supported,
+    )
+
+    asyncio.run(crawl(crawl_settings, run_id, website, concurrency=4))
+
+    (run,) = rows(database, "SELECT status FROM crawl_runs")
+    assert run["status"] == "finished"
+    outcomes = {
+        url: (fetch["outcome"], fetch["reason"], fetch["duration_ms"] is not None)
+        for url, fetch in fetches_by_url(database, run_id).items()
+    }
+    assert outcomes == {
+        f"{SITE}/": ("fetched", None, True),
+        **dict.fromkeys(supported, ("fetched", None, True)),
+        f"{SITE}/files/archive.zip": ("skipped_type", "extension zip", False),
+        f"{SITE}/files/setup.exe": ("skipped_type", "extension exe", False),
+    }
+    snapshots = {
+        row["url"]: row["media_type"]
+        for row in rows(
+            database,
+            "SELECT w.url, s.media_type FROM webpage_snapshots s"
+            " JOIN webpages w ON w.id = s.webpage_id",
+        )
+    }
+    assert snapshots == {f"{SITE}/": "text/html", **supported}
+    # Each page and file cost exactly one GET; no HEAD, and nothing for the refused ones.
+    assert set(website.methods) == {"GET"}
+    assert sorted(website.page_requests) == sorted([f"{SITE}/", *supported])
+
+
+class Body(httpx.AsyncByteStream):
+    """`chunks` chunks of 1 MiB, counting how many were read."""
+
+    def __init__(self, chunks: int) -> None:
+        self.chunks = chunks
+        self.read = 0
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        chunk = b"x" * (1024 * 1024)
+        for _ in range(self.chunks):
+            self.read += 1
+            yield chunk
+
+
+def test_a_response_of_an_unsupported_type_or_over_100_mb_is_dropped_before_its_body(
+    crawl_settings: Settings, database: Engine
+):
+    run_id = create_run()
+    archive, declared, streamed, small = Body(5), Body(200), Body(150), Body(3)
+    responses: dict[str, Callable[[], httpx.Response]] = {
+        # No extension: the Content-Type decides.
+        f"{SITE}/download/archive": lambda: httpx.Response(
+            200, headers={"Content-Type": "application/zip"}, stream=archive
+        ),
+        f"{SITE}/download/declared.pdf": lambda: httpx.Response(
+            200,
+            headers={"Content-Type": "application/pdf", "Content-Length": str(200 * 1024 * 1024)},
+            stream=declared,
+        ),
+        # No Content-Length: the size is only known while it streams.
+        f"{SITE}/download/streamed.pdf": lambda: httpx.Response(
+            200, headers={"Content-Type": "application/pdf"}, stream=streamed
+        ),
+        f"{SITE}/download/small.pdf": lambda: httpx.Response(
+            200, headers={"Content-Type": "application/pdf"}, stream=small
+        ),
+    }
+    website = Website({f"{SITE}/": page(*responses)}, responses=responses)
+
+    asyncio.run(crawl(crawl_settings, run_id, website))
+
+    (run,) = rows(database, "SELECT status FROM crawl_runs")
+    assert run["status"] == "finished"
+    cap = 100 * 1024 * 1024
+    outcomes = {
+        url: (fetch["outcome"], fetch["reason"], fetch["http_status"], fetch["snapshot_id"])
+        for url, fetch in fetches_by_url(database, run_id).items()
+        if url != f"{SITE}/"
+    }
+    small_snapshot = outcomes[f"{SITE}/download/small.pdf"][3]
+    assert small_snapshot is not None
+    assert outcomes == {
+        f"{SITE}/download/archive": ("skipped_type", "content_type application/zip", 200, None),
+        f"{SITE}/download/declared.pdf": (
+            "skipped_size",
+            f"content_length {200 * 1024 * 1024} > {cap}",
+            200,
+            None,
+        ),
+        f"{SITE}/download/streamed.pdf": ("skipped_size", f"body > {cap} bytes", 200, None),
+        f"{SITE}/download/small.pdf": ("fetched", None, 200, small_snapshot),
+    }
+    # Refused on its headers: not a byte of the body was read.
+    assert (archive.read, declared.read) == (0, 0)
+    # Dropped once it passed 100 MiB, the rest left unread.
+    assert streamed.read == 101
+    assert small.read == 3
+    # Only the homepage and the small file wrote snapshots.
+    snapshots = rows(
+        database,
+        "SELECT w.url, s.size_bytes FROM webpage_snapshots s"
+        " JOIN webpages w ON w.id = s.webpage_id",
+    )
+    assert sorted((row["url"], row["size_bytes"]) for row in snapshots) == [
+        (f"{SITE}/", len(page(*responses))),
+        (f"{SITE}/download/small.pdf", 3 * 1024 * 1024),
+    ]
+    # One GET each.
+    assert set(website.methods) == {"GET"}
+    assert sorted(website.page_requests) == sorted([f"{SITE}/", *responses])

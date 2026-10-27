@@ -556,6 +556,17 @@
               }
             ],
             "title": "Limit"
+          },
+          "max_file_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max File Bytes"
           }
         },
         "type": "object",

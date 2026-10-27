@@ -95,10 +95,20 @@ def test_runs_are_listed_newest_first_a_page_at_a_time(client: TestClient, db: D
     assert newer["id"] == str(ids["newer"])
     assert newer["status"] == "finished"
     assert newer["institution_name"] == "CreateTO"
-    assert newer["settings"] == {"trigger": "cli", "mode": "full", "limit": 25}
+    assert newer["settings"] == {
+        "trigger": "cli",
+        "mode": "full",
+        "limit": 25,
+        "max_file_bytes": None,
+    }
     assert older["id"] == str(ids["older"])
     assert older["status"] == "queued"
-    assert older["settings"] == {"trigger": "cli", "mode": "full", "limit": None}
+    assert older["settings"] == {
+        "trigger": "cli",
+        "mode": "full",
+        "limit": None,
+        "max_file_bytes": None,
+    }
 
 
 def test_a_runs_fetches_are_a_page_with_their_snapshots(client: TestClient, db: Database):

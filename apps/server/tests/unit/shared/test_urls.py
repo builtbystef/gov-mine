@@ -3,7 +3,13 @@ from pathlib import Path
 
 import pytest
 
-from gov_mine.shared.urls import find_links, is_within, looks_like_file, normalise_url
+from gov_mine.shared.urls import (
+    find_links,
+    is_within,
+    looks_like_file,
+    normalise_url,
+    unsupported_extension,
+)
 
 PROJECTS = Path(__file__).resolve().parents[3] / "fixtures" / "createto" / "projects"
 
@@ -104,3 +110,34 @@ def test_a_url_with_a_file_extension_looks_like_a_file(url: str):
 )
 def test_a_url_without_a_file_extension_does_not(url: str):
     assert not looks_like_file(url)
+
+
+@pytest.mark.parametrize(
+    ("url", "extension"),
+    [
+        ("https://createto.ca/files/archive.zip", "zip"),
+        ("https://createto.ca/setup.EXE", "exe"),
+        ("https://createto.ca/data/parcels.tar.gz?v=2", "gz"),
+        ("https://createto.ca/_next/static/app.js", "js"),
+        ("https://createto.ca/video/tour.mp4", "mp4"),
+    ],
+)
+def test_a_url_with_an_unsupported_extension_names_it(url: str, extension: str):
+    assert unsupported_extension(url) == extension
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://createto.ca/",
+        "https://createto.ca/projects",
+        "https://createto.ca/page.html",
+        "https://createto.ca/news.aspx",
+        "https://createto.ca/report.pdf",
+        "https://createto.ca/budget.xlsx",
+        "https://createto.ca/v1.2/notes",
+        "https://createto.ca/archive.zip/view",
+    ],
+)
+def test_a_page_or_a_supported_file_has_no_unsupported_extension(url: str):
+    assert unsupported_extension(url) is None

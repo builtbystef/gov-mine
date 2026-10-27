@@ -7,6 +7,7 @@ import asyncio
 import logging
 import time
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from urllib.parse import urljoin, urlsplit
 
@@ -37,7 +38,13 @@ from gov_mine.shared import addresses
 from gov_mine.shared.exceptions import NotFoundError
 from gov_mine.shared.robots import robots_allows, robots_crawl_delay, robots_url
 from gov_mine.shared.sitemaps import parse_sitemap
-from gov_mine.shared.urls import find_links, is_within, looks_like_file, normalise_url
+from gov_mine.shared.urls import (
+    find_links,
+    is_within,
+    looks_like_file,
+    normalise_url,
+    unsupported_extension,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +56,22 @@ FINISH_POLL = timedelta(seconds=3)
 
 DEFAULT_MEDIA_TYPE = "application/octet-stream"
 HTML_MEDIA_TYPES = frozenset({"text/html", "application/xhtml+xml"})
+# What the crawler downloads when the URL's extension does not say: HTML, PDF, office files, csv
+# and plain text, and any image (`image/*`).
+SUPPORTED_MEDIA_TYPES = HTML_MEDIA_TYPES | {
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "text/csv",
+    "text/plain",
+}
+# The largest body the crawler keeps (decision 31): it guards memory and storage against
+# datasets, archives and decompression bombs. A run records it in its settings.
+MAX_FILE_BYTES = 100 * 1024 * 1024
 # A URL more than this many links from a seed is not fetched (decision 31): it stops crawler
 # traps such as endless calendars.
 MAX_DEPTH = 50
@@ -276,6 +299,83 @@ async def address_refusal(url: str) -> tuple[FetchOutcome, str] | None:
     return None
 
 
+def type_refusal(url: str) -> tuple[FetchOutcome, str] | None:
+    """Why the fence turns `url` down for the type its extension names, or None."""
+    extension = unsupported_extension(url)
+    if extension is not None:
+        return FetchOutcome.SKIPPED_TYPE, f"extension {extension}"
+    return None
+
+
+def response_refusal(
+    url: str, response: httpx.Response, max_bytes: int
+) -> tuple[FetchOutcome, str] | None:
+    """Why a 200 for `url` is dropped on its headers alone, before its body is read, or None:
+    a `Content-Type` the crawler does not download, unless the URL's extension already said it
+    does (servers often call a PDF `application/octet-stream`), or a `Content-Length` over
+    `max_bytes`."""
+    media_type = media_type_of(response)
+    if not looks_like_file(url) and not _supported(media_type):
+        return FetchOutcome.SKIPPED_TYPE, f"content_type {media_type}"
+    length = response.headers.get("content-length", "")
+    if length.isdigit() and int(length) > max_bytes:
+        return FetchOutcome.SKIPPED_SIZE, f"content_length {length} > {max_bytes}"
+    return None
+
+
+def _supported(media_type: str) -> bool:
+    return media_type in SUPPORTED_MEDIA_TYPES or media_type.startswith("image/")
+
+
+async def read_body(response: httpx.Response, max_bytes: int) -> bytes | None:
+    """The body of a streamed `response`, decompressed, or None as soon as it passes
+    `max_bytes`: what has been read so far is dropped and the rest is never read."""
+    chunks: list[bytes] = []
+    size = 0
+    async for chunk in response.aiter_bytes():
+        size += len(chunk)
+        if size > max_bytes:
+            return None
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+@dataclass
+class Download:
+    """What one GET brought back: why it was dropped, or else its body."""
+
+    http_status: int | None = None
+    dropped: tuple[FetchOutcome, str | None] | None = None
+    body: bytes = b""
+    media_type: str = DEFAULT_MEDIA_TYPE
+    encoding: str = "utf-8"
+
+
+async def download(http: httpx.AsyncClient, url: str, max_bytes: int) -> Download:
+    """Send one GET for `url` and stream its body, unless it is not a 200 (`failed_http`), its
+    headers refuse it (`response_refusal`) or it streams past `max_bytes` (`skipped_size`): the
+    rest of the body is then never read. A timeout is `failed_timeout`."""
+    got = Download()
+    try:
+        async with http.stream("GET", url) as response:
+            got.http_status = response.status_code
+            got.media_type = media_type_of(response)
+            got.encoding = response.encoding or got.encoding
+            if response.status_code != httpx.codes.OK:
+                got.dropped = FetchOutcome.FAILED_HTTP, None
+                return got
+            got.dropped = response_refusal(url, response, max_bytes)
+            if got.dropped is None:
+                body = await read_body(response, max_bytes)
+                if body is None:
+                    got.dropped = FetchOutcome.SKIPPED_SIZE, f"body > {max_bytes} bytes"
+                else:
+                    got.body = body
+    except httpx.TimeoutException as exc:
+        return Download(dropped=(FetchOutcome.FAILED_TIMEOUT, type(exc).__name__))
+    return got
+
+
 def refusal(
     url: str, policy: CrawlPolicy, website_url: str, depth: int
 ) -> tuple[FetchOutcome, str] | None:
@@ -367,15 +467,20 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
     """Fetch a webpage found `depth` links from a seed and log the attempt as a `fetches` row.
 
     Once the run has sent its `--limit` requests, nothing happens and None is returned. A URL
-    the fence (its address first, then the host policy, prefix and depth) or the host's
-    robots.txt refuses gets its row and no request; reading robots.txt writes no row and does
-    not count toward `--limit`. Otherwise a 200 hands the body to
-    `ingest.store`: `fetched` with the new snapshot, or `unchanged` when the bytes are the ones
-    already kept; an HTML page on a `crawl` host then queues its links one link deeper (what a
-    `files_only` host serves is never followed, whatever its type). Any other status is
-    `failed_http`, and a timeout `failed_timeout`. A request, robots.txt's included, first waits
-    out the host's delay; a sent request's `requested_at` is when it was sent."""
+    the fence (its address first, then the host policy, prefix and depth, the host's
+    robots.txt, and the type its extension names) refuses gets its row and no request; reading
+    robots.txt writes no row and does not count toward `--limit`. Otherwise one GET is sent and
+    its body streamed: a 200 of a type not downloaded (`skipped_type`) or with a
+    `Content-Length` over the run's `max_file_bytes` (`skipped_size`) is dropped before its
+    body is read, and a body that streams past the cap is dropped as `skipped_size`. The rest
+    is handed to `ingest.store`: `fetched` with the new snapshot, or `unchanged` when the bytes
+    are the ones already kept; an HTML page on a `crawl` host then queues its links one link
+    deeper (what a `files_only` host serves is never followed, whatever its type). Any other
+    status is `failed_http`, and a timeout `failed_timeout`. A request, robots.txt's included,
+    first waits out the host's delay; a sent request's `requested_at` is when it was sent."""
     run = await get_run(session, run_id)
+    # A run from before the cap was recorded gets today's.
+    max_bytes: int = run.settings.get("max_file_bytes", MAX_FILE_BYTES)
     limit = run.settings.get("limit")
     if limit is not None:
         await lock_run(session, run.id)
@@ -392,6 +497,8 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
         refused = refusal(webpage.url, domain.crawl_policy, institution.website_url, depth)
     if refused is None:
         refused = await robots_refusal(session, http, run, domain, webpage.url)
+    if refused is None:
+        refused = type_refusal(webpage.url)
     if refused is not None:
         fetch.outcome, fetch.reason = refused
         session.add(fetch)
@@ -399,30 +506,19 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
         return fetch
     fetch.requested_at = await wait_for_host(session, domain.id)
     started = time.perf_counter()
-    try:
-        response = await http.get(webpage.url)
-    except httpx.TimeoutException as exc:
-        fetch.duration_ms = _ms_since(started)
-        fetch.outcome = FetchOutcome.FAILED_TIMEOUT
-        fetch.reason = type(exc).__name__
+    got = await download(http, webpage.url, max_bytes)
+    fetch.duration_ms = _ms_since(started)
+    fetch.http_status = got.http_status
+    if got.dropped is not None:
+        fetch.outcome, fetch.reason = got.dropped
     else:
-        fetch.duration_ms = _ms_since(started)
-        fetch.http_status = response.status_code
-        if response.status_code == httpx.codes.OK:
-            fetch.snapshot_id = await ingest.store(
-                session, store, webpage.id, response.content, media_type_of(response)
-            )
-            fetch.outcome = (
-                FetchOutcome.FETCHED if fetch.snapshot_id is not None else FetchOutcome.UNCHANGED
-            )
-            if (
-                domain.crawl_policy is CrawlPolicy.CRAWL
-                and media_type_of(response) in HTML_MEDIA_TYPES
-            ):
-                links = find_links(response.text, webpage.url)
-                await queue_links(session, run.id, webpage, links, depth + 1)
-        else:
-            fetch.outcome = FetchOutcome.FAILED_HTTP
+        fetch.snapshot_id = await ingest.store(session, store, webpage.id, got.body, got.media_type)
+        fetch.outcome = (
+            FetchOutcome.FETCHED if fetch.snapshot_id is not None else FetchOutcome.UNCHANGED
+        )
+        if domain.crawl_policy is CrawlPolicy.CRAWL and got.media_type in HTML_MEDIA_TYPES:
+            links = find_links(got.body.decode(got.encoding, errors="replace"), webpage.url)
+            await queue_links(session, run.id, webpage, links, depth + 1)
     session.add(fetch)
     await session.flush()
     return fetch
@@ -503,8 +599,11 @@ __all__ = [
     "FINISH_POLL",
     "FINISH_TASK",
     "MAX_DEPTH",
+    "MAX_FILE_BYTES",
     "START_TASK",
+    "Download",
     "address_refusal",
+    "download",
     "ensure_domain",
     "ensure_webpage",
     "fetch_page",
@@ -516,10 +615,13 @@ __all__ = [
     "queue",
     "queue_fetch",
     "queue_links",
+    "read_body",
     "read_robots",
     "read_sitemap",
     "refusal",
+    "response_refusal",
     "robots_refusal",
     "start_run",
+    "type_refusal",
     "wait_for_host",
 ]

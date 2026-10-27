@@ -9,13 +9,13 @@ The crawler only downloads types it can store and parse, and nothing over 100 MB
 
 ## Acceptance criteria
 
-- [ ] A link with an unsupported extension (such as `.zip` or `.exe`) gets a `skipped_type` fetch and no request.
-- [ ] A response whose `Content-Type` is unsupported is `skipped_type` and its body is not read.
-- [ ] A response with `Content-Length` over 100 MB is `skipped_size` and its body is not read.
-- [ ] A response without `Content-Length` whose body streams past 100 MB is dropped as `skipped_size`, and no snapshot is written.
-- [ ] Supported types are HTML, PDF, office files (docx, xlsx, pptx and their older forms), csv, txt and images; each of them is fetched.
-- [ ] A fetched page costs exactly one request: no HEAD is ever sent.
-- [ ] The size cap is recorded in the run's `settings`.
+- [x] A link with an unsupported extension (such as `.zip` or `.exe`) gets a `skipped_type` fetch and no request.
+- [x] A response whose `Content-Type` is unsupported is `skipped_type` and its body is not read.
+- [x] A response with `Content-Length` over 100 MB is `skipped_size` and its body is not read.
+- [x] A response without `Content-Length` whose body streams past 100 MB is dropped as `skipped_size`, and no snapshot is written.
+- [x] Supported types are HTML, PDF, office files (docx, xlsx, pptx and their older forms), csv, txt and images; each of them is fetched.
+- [x] A fetched page costs exactly one request: no HEAD is ever sent.
+- [x] The size cap is recorded in the run's `settings`.
 
 ## Out of scope
 

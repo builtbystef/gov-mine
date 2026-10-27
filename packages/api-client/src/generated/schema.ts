@@ -250,6 +250,8 @@ export interface components {
             mode: "full" | "incremental";
             /** Limit */
             limit?: number | null;
+            /** Max File Bytes */
+            max_file_bytes?: number | null;
         };
         /**
          * RunStatus

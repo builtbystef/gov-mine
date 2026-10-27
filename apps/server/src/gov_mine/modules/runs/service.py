@@ -29,13 +29,15 @@ async def create_run(
     limit: int | None = None,
 ) -> CrawlRun:
     """A `queued` run of the institution, and its `crawl.start` job in the same transaction.
-    With `limit`, the run sends at most that many requests. Raises `NotFoundError` for an
-    unknown institution, before anything is written."""
+    With `limit`, the run sends at most that many requests. Its settings record the fence's
+    size cap. Raises `NotFoundError` for an unknown institution, before anything is written."""
     await institutions.get_institution(session, institution_id)
     run = CrawlRun(
         institution_id=institution_id,
         status=RunStatus.QUEUED,
-        settings=RunSettings(trigger=trigger, mode=mode, limit=limit).model_dump(),
+        settings=RunSettings(
+            trigger=trigger, mode=mode, limit=limit, max_file_bytes=crawl.MAX_FILE_BYTES
+        ).model_dump(),
     )
     session.add(run)
     await session.flush()

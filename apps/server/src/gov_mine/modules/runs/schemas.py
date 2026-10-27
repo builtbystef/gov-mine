@@ -18,6 +18,8 @@ class RunSettings(BaseModel):
     mode: RunMode
     # At most this many requests are sent (`--limit`, a development knob); refusals don't count.
     limit: int | None = None
+    # The largest file the run downloads, in bytes; None on runs from before it was recorded.
+    max_file_bytes: int | None = None
 
 
 class RunOutput(BaseModel):

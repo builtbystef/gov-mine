@@ -23,6 +23,19 @@ FILE_EXTENSIONS = frozenset(
         *("avif", "bmp", "gif", "jpeg", "jpg", "png", "svg", "tif", "tiff", "webp"),
     }
 )
+# The extensions of what the crawler never downloads: archives, programs and disk images, video
+# and audio, a site's code, styles and fonts, and data it cannot parse. A URL ending in one is
+# refused before any request; one ending in neither list is judged by its response's headers.
+UNSUPPORTED_EXTENSIONS = frozenset(
+    {
+        *("zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz"),
+        *("exe", "msi", "dmg", "pkg", "apk", "deb", "rpm", "jar", "bin", "iso", "img"),
+        *("mp4", "m4v", "mov", "avi", "wmv", "mkv", "webm", "flv", "mpg", "mpeg"),
+        *("mp3", "m4a", "wav", "aac", "ogg", "oga", "flac", "wma"),
+        *("js", "mjs", "css", "map", "woff", "woff2", "ttf", "otf", "eot", "ico"),
+        *("json", "xml", "rss", "ics", "kml", "kmz", "shp", "dwg", "rtf", "odt", "ods", "odp"),
+    }
+)
 
 # An absolute http(s) URL in running text: up to the first character a URL cannot hold.
 _ABSOLUTE_URL = re.compile(r"""https?://[^\s"'<>\\^`{|}]+""", re.IGNORECASE)
@@ -82,6 +95,12 @@ def looks_like_file(url: str) -> bool:
     return extension_of(url) in FILE_EXTENSIONS
 
 
+def unsupported_extension(url: str) -> str | None:
+    """The extension of `url` when it names a type the crawler never downloads, else None."""
+    extension = extension_of(url)
+    return extension if extension in UNSUPPORTED_EXTENSIONS else None
+
+
 def find_links(html: str, page_url: str) -> list[str]:
     """Every http(s) URL an HTML page holds, normalised, each once, in the order found: the
     `<a href>` targets resolved against the page (or its `<base href>`), then every absolute URL
@@ -121,9 +140,11 @@ __all__ = [
     "DEFAULT_PORTS",
     "FILE_EXTENSIONS",
     "TRACKING_PARAMETERS",
+    "UNSUPPORTED_EXTENSIONS",
     "extension_of",
     "find_links",
     "is_within",
     "looks_like_file",
     "normalise_url",
+    "unsupported_extension",
 ]
