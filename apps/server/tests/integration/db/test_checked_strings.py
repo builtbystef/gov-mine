@@ -49,7 +49,7 @@ def checked_columns() -> list[tuple[str, str, type[StrEnum], str]]:
 
 
 def test_the_models_declare_checked_strings():
-    assert len(checked_columns()) == 8
+    assert len(checked_columns()) == 11
 
 
 @pytest.mark.parametrize(("table", "name", "enum", "column"), checked_columns())

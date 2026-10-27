@@ -37,9 +37,15 @@ class Usage:
     reported_cost: Decimal | None = None
 
 
+def _provider(api_key: str, http_client: httpx2.AsyncClient | None = None) -> OpenRouterProvider:
+    """The OpenAI client's own retries are off: callers decide how often to try again."""
+    built = OpenRouterProvider(api_key=api_key, http_client=http_client)
+    return OpenRouterProvider(openai_client=built.client.with_options(max_retries=0))
+
+
 @lru_cache(maxsize=4)
 def _model(api_key: str, model_name: str) -> Model:
-    return OpenRouterModel(model_name, provider=OpenRouterProvider(api_key=api_key))
+    return OpenRouterModel(model_name, provider=_provider(api_key))
 
 
 def create_model(
@@ -52,9 +58,7 @@ def create_model(
     api_key = settings.openrouter_api_key.get_secret_value()
     if http_client is None:
         return _model(api_key, model_name)
-    return OpenRouterModel(
-        model_name, provider=OpenRouterProvider(api_key=api_key, http_client=http_client)
-    )
+    return OpenRouterModel(model_name, provider=_provider(api_key, http_client))
 
 
 def extract_model_settings(settings: Settings) -> OpenRouterModelSettings:

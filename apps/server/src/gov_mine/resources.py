@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import httpx
+import httpx2
 from procrastinate import App
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
@@ -43,6 +44,8 @@ class Resources:
     http: httpx.AsyncClient
     # The client for model providers (OpenRouter's Decisions API).
     models_http: httpx.AsyncClient
+    # The extraction model's client; None uses Pydantic AI's own. Tests answer OpenRouter here.
+    extract_http: httpx2.AsyncClient | None = None
 
     def session(self) -> AsyncSession:
         """A new session. One per request or job run; commit explicitly."""
@@ -50,13 +53,14 @@ class Resources:
 
 
 @asynccontextmanager
-async def build_resources(
+async def build_resources(  # noqa: PLR0913 - the settings and a double per resource
     settings: Settings,
     *,
     object_store: ObjectStore | None = None,
     jobs_connector: BaseConnector | None = None,
     http: httpx.AsyncClient | None = None,
     models_http: httpx.AsyncClient | None = None,
+    extract_http: httpx2.AsyncClient | None = None,
 ) -> AsyncGenerator[Resources]:
     """Open every resource from `settings` and close them on exit. The engine
     connects lazily; the object store and the job queue open their pools here.
@@ -83,6 +87,7 @@ async def build_resources(
             jobs=jobs,
             http=http,
             models_http=models_http,
+            extract_http=extract_http,
         )
 
 

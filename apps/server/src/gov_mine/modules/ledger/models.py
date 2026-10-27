@@ -29,8 +29,7 @@ class AICall(UUIDPrimaryKey, CreatedAt, Base):
     # None only for an extraction rerun by hand outside a run.
     crawl_run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("crawl_runs.id"))
     classification_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("classifications.id"))
-    # Its foreign key comes with the extractions table.
-    extraction_id: Mapped[uuid.UUID | None]
+    extraction_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("extractions.id"))
     purpose: Mapped[AIPurpose] = checked_string(AIPurpose, "purpose")
     provider: Mapped[str] = mapped_column(String(50))
     model: Mapped[str] = mapped_column(String(100))

@@ -58,6 +58,11 @@ SITEMAP = "https://createto.ca/sitemap.xml"
 DATABASE = "gov_mine_test_crawl" + os.environ.get("TEST_DATABASE_SUFFIX", "")
 # The run must be finished well within this; it takes a few seconds.
 DEADLINE_SECONDS = 30
+# The extractor per record type, as a run's settings record them (023).
+EXTRACTORS = {
+    t: f"model:{t}@1"
+    for t in ("project", "news_item", "meeting", "contact", "rfp", "grant", "contract")
+}
 
 
 def invoke(*args: str) -> tuple[int, str]:
@@ -342,6 +347,7 @@ def test_a_full_run_crawls_the_homepage_into_a_snapshot(crawl_settings: Settings
         "mode": "full",
         "limit": 1,
         "max_file_bytes": 100 * 1024 * 1024,
+        "extractors": EXTRACTORS,
     }
     assert run["institution_id"] == institution["id"]
     queued = rows(database, "SELECT task_name, args FROM procrastinate_jobs")
@@ -587,6 +593,7 @@ def test_run_create_limit_caps_the_requests_the_run_sends(
         "mode": "full",
         "limit": 3,
         "max_file_bytes": 100 * 1024 * 1024,
+        "extractors": EXTRACTORS,
     }
     pages = {f"{SITE}/": page("https://elsewhere.example/", *(f"/p/{n}" for n in range(10)))}
     pages |= {f"{SITE}/p/{n}": page(*(f"/p/{n}/{m}" for m in range(10))) for n in range(10)}

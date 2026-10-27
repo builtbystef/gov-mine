@@ -17,6 +17,7 @@ from gov_mine.jobs import registry
 from gov_mine.jobs.tasks import defer
 from gov_mine.modules.ingest.models import TextStatus, WebpageSnapshot
 from gov_mine.shared.exceptions import ConflictError, NotFoundError
+from gov_mine.shared.text import text_hash
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +113,7 @@ async def parse(session: AsyncSession, store: ObjectStore, snapshot_id: uuid.UUI
     for page, markdown in enumerate(parsed.pages, start=1):
         await store.put(text_key(snapshot.id, page), markdown.encode(), TEXT_MEDIA_TYPE)
     snapshot.parser = parsed.parser
+    snapshot.text_hash = text_hash(parsed.pages)
     snapshot.text_status = TextStatus.READY
 
 

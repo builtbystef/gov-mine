@@ -430,6 +430,10 @@ export interface components {
             limit?: number | null;
             /** Max File Bytes */
             max_file_bytes?: number | null;
+            /** Extractors */
+            extractors?: {
+                [key: string]: string;
+            } | null;
         };
         /**
          * RunStatus

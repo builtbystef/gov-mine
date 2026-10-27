@@ -20,6 +20,7 @@ from gov_mine.shared.routing import generate_unique_id
 
 if TYPE_CHECKING:
     import httpx
+    import httpx2
     from procrastinate.connector import BaseConnector
 
     from gov_mine.integrations.storage import ObjectStore
@@ -31,6 +32,7 @@ def create_app(
     object_store: ObjectStore | None = None,
     jobs_connector: BaseConnector | None = None,
     models_http: httpx.AsyncClient | None = None,
+    extract_http: httpx2.AsyncClient | None = None,
 ) -> FastAPI:
     """The doubles go to `build_resources`; tests pass an in-memory store and an
     in-memory queue."""
@@ -46,6 +48,7 @@ def create_app(
             object_store=object_store,
             jobs_connector=jobs_connector,
             models_http=models_http,
+            extract_http=extract_http,
         ) as resources:
             yield {"resources": resources}
 

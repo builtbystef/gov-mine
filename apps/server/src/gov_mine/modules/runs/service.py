@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from gov_mine.modules.crawl import service as crawl
 from gov_mine.modules.crawl.models import CrawlRun, Fetch, RunStatus, Webpage
+from gov_mine.modules.extract import service as extract
 from gov_mine.modules.ingest.models import WebpageSnapshot
 from gov_mine.modules.institutions import service as institutions
 from gov_mine.modules.institutions.models import Institution
@@ -36,7 +37,11 @@ async def create_run(
         institution_id=institution_id,
         status=RunStatus.QUEUED,
         settings=RunSettings(
-            trigger=trigger, mode=mode, limit=limit, max_file_bytes=crawl.MAX_FILE_BYTES
+            trigger=trigger,
+            mode=mode,
+            limit=limit,
+            max_file_bytes=crawl.MAX_FILE_BYTES,
+            extractors=extract.extractor_versions(),
         ).model_dump(),
     )
     session.add(run)

@@ -22,6 +22,7 @@ TASK_MODULES = [
     "gov_mine.jobs.stalled",
     "gov_mine.modules.classify.jobs",
     "gov_mine.modules.crawl.jobs",
+    "gov_mine.modules.extract.jobs",
     "gov_mine.modules.ingest.jobs",
 ]
 

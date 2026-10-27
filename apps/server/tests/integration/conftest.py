@@ -1,8 +1,12 @@
-"""Fixtures for the app client, the test transaction, and the inline job queue."""
+"""Fixtures for the app client, the test transaction, the inline job queue, and OpenRouter's
+chat completions endpoint for the extraction model."""
 
+import json
+import re
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+import httpx2
 import pytest
 from fastapi.testclient import TestClient
 from procrastinate.testing import InMemoryConnector
@@ -170,3 +174,62 @@ def db(
 def client(app_client: TestClient, db: Database) -> TestClient:  # noqa: ARG001
     """`app_client` with the `db` transaction."""
     return app_client
+
+
+OPENROUTER_KEY = "sk-or-test-not-a-real-key"
+_URL = re.compile(r"^URL: (\S+)$", re.MULTILINE)
+
+
+class OpenRouter:
+    """Answers with the JSON a test set for the URL in the prompt, or fails with 502
+    `failures` times first."""
+
+    def __init__(self, answers: dict[str, Any] | None = None, failures: int = 0) -> None:
+        self.answers: dict[str, Any] = answers or {}
+        self.failures = failures
+        self.requests: list[dict[str, Any]] = []
+
+    def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        assert str(request.url) == "https://openrouter.ai/api/v1/chat/completions"
+        assert request.headers["Authorization"] == f"Bearer {OPENROUTER_KEY}"
+        body = json.loads(request.content)
+        self.requests.append(body)
+        if len(self.requests) <= self.failures:
+            return httpx2.Response(502, json={"error": {"message": "Provider returned error"}})
+        prompt = body["messages"][-1]["content"]
+        url = _URL.search(prompt if isinstance(prompt, str) else prompt[0]["text"])
+        assert url is not None
+        return httpx2.Response(
+            200,
+            json={
+                "id": "gen-1",
+                "object": "chat.completion",
+                "created": 1_793_000_000,
+                "model": body["model"],
+                "provider": "OpenAI",
+                "choices": [
+                    {
+                        "index": 0,
+                        "finish_reason": "stop",
+                        "message": {
+                            "role": "assistant",
+                            "content": json.dumps(self.answers[url.group(1)]),
+                        },
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": 2000,
+                    "completion_tokens": 400,
+                    "total_tokens": 2400,
+                    "cost": 0.0004,
+                },
+            },
+        )
+
+    def client(self) -> httpx2.AsyncClient:
+        return httpx2.AsyncClient(transport=httpx2.MockTransport(self))
+
+
+@pytest.fixture
+def openrouter() -> OpenRouter:
+    return OpenRouter()

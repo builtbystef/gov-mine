@@ -20,6 +20,8 @@ class RunSettings(BaseModel):
     limit: int | None = None
     # The largest file the run downloads, in bytes; None on runs from before it was recorded.
     max_file_bytes: int | None = None
+    # The extractor per record type (`model:<record_type>@<version>`); None on older runs.
+    extractors: dict[str, str] | None = None
 
 
 class RunOutput(BaseModel):

@@ -20,7 +20,7 @@ from gov_mine.modules.ledger.models import AICall, AIPurpose
 if TYPE_CHECKING:
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
-    from tests.integration.conftest import Database, InlineConnector
+    from tests.integration.conftest import Database, InlineConnector, OpenRouter
 
     from gov_mine.config import Settings
     from gov_mine.integrations.storage.memory import MemoryObjectStore
@@ -81,13 +81,20 @@ def settings(settings: Settings) -> Settings:
 
 @pytest.fixture
 def app(
-    settings: Settings, object_store: MemoryObjectStore, queue: InlineConnector, jev: Jev
+    settings: Settings,
+    object_store: MemoryObjectStore,
+    queue: InlineConnector,
+    jev: Jev,
+    openrouter: OpenRouter,
 ) -> FastAPI:
+    # The release becomes a news document, which is extracted.
+    openrouter.answers[RELEASE] = {"document_date": None, "records": []}
     return create_app(
         settings,
         object_store=object_store,
         jobs_connector=queue,
         models_http=httpx.AsyncClient(transport=httpx.MockTransport(jev)),
+        extract_http=openrouter.client(),
     )
 
 
@@ -181,7 +188,8 @@ def test_each_new_page_is_classified_once_into_a_source_or_document(
     assert listing.raw_output is not None
     assert listing.raw_output["confidence"] == 0.8
     assert len(listing.raw_output["probabilities"]) == 25
-    calls = db.run(_rows, db, AICall)
+    # The release, a news document, is extracted too (023).
+    calls = [c for c in db.run(_rows, db, AICall) if c.purpose is not AIPurpose.EXTRACT]
     assert {call.classification_id for call in calls} == {c.id for c in classifications.values()}
     assert all(call.purpose is AIPurpose.CLASSIFY for call in calls)
     # 1000 tokens at 0.042 per million, output free.
@@ -206,8 +214,8 @@ def test_each_new_page_is_classified_once_into_a_source_or_document(
 
     # The run's paid calls, sources and documents by type, over the API.
     ai_calls = client.get("/ai-calls", params={"run": str(run_id)}).json()
-    assert ai_calls["total"] == 3
-    assert {call["purpose"] for call in ai_calls["items"]} == {"classify"}
+    assert ai_calls["total"] == 4
+    assert [call["purpose"] for call in ai_calls["items"]].count("classify") == 3
     sources = client.get(f"/runs/{run_id}/sources").json()
     assert [(s["url"], s["document_type"]) for s in sources["items"]] == [(NEWS, "press_releases")]
     counts = client.get(f"/runs/{run_id}/document-counts").json()

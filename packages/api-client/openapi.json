@@ -1054,6 +1054,20 @@
               }
             ],
             "title": "Max File Bytes"
+          },
+          "extractors": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extractors"
           }
         },
         "type": "object",

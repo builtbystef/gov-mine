@@ -9,12 +9,12 @@ A snapshot is never extracted twice by the same extractor. The model reruns on a
 
 ## Acceptance criteria
 
-- [ ] Running `extract.document` twice for the same snapshot and extractor writes one extraction and makes one model call.
-- [ ] A new snapshot with the same `text_hash` as the previous one (bytes changed, text didn't) gets no model extraction and no model call.
-- [ ] A new snapshot with a different `text_hash` is extracted by the model again.
-- [ ] A re-extraction that returns the same values writes an extraction and no new record snapshot.
-- [ ] A re-extraction where one field changed writes one new record snapshot for that record only.
-- [ ] A record a later extraction no longer mentions keeps its last state.
+- [x] Running `extract.document` twice for the same snapshot and extractor writes one extraction and makes one model call.
+- [x] A new snapshot with the same `text_hash` as the previous one (bytes changed, text didn't) gets no model extraction and no model call.
+- [x] A new snapshot with a different `text_hash` is extracted by the model again.
+- [x] A re-extraction that returns the same values writes an extraction and no new record snapshot.
+- [x] A re-extraction where one field changed writes one new record snapshot for that record only.
+- [x] A record a later extraction no longer mentions keeps its last state.
 
 ## Notes
 
