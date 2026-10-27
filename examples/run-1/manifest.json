@@ -1,0 +1,29 @@
+{
+  "exported_at": "2026-10-27T15:42:05.218237+00:00",
+  "cutoff": "2021-10-27",
+  "runs": [
+    {
+      "institution": "CreateTO",
+      "run": "01a17def-b8eb-77e4-a3a3-9c94d718df6c",
+      "finished_at": "2026-10-27T15:41:27.834738+00:00"
+    }
+  ],
+  "extractors": [
+    "model:contact@1",
+    "model:meeting@1",
+    "model:news_item@1",
+    "model:project@1",
+    "model:rfp@1"
+  ],
+  "files": {
+    "citations.jsonl": 1501,
+    "contacts.jsonl": 95,
+    "contracts.jsonl": 0,
+    "documents.jsonl": 448,
+    "grants.jsonl": 0,
+    "meetings.jsonl": 195,
+    "news_items.jsonl": 34,
+    "projects.jsonl": 155,
+    "rfps.jsonl": 1
+  }
+}
