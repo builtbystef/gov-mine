@@ -9,6 +9,8 @@ import { formatBytes } from "@/lib/formatting/bytes";
 import { findExcerpt } from "@/features/snapshots/highlight";
 import { formatDateTime } from "@/lib/formatting/dates";
 
+import { ScrollToExcerpt } from "./scroll-to-excerpt";
+
 /** A snapshot: what was stored, and one page of the text parsed from it. */
 export function SnapshotDetail({
   snapshot,
@@ -123,6 +125,7 @@ function MarkedText({ text, highlight }: { text: string; highlight: string | und
               {text.slice(at[0], at[1])}
             </mark>
             {text.slice(at[1])}
+            <ScrollToExcerpt />
           </>
         ) : (
           text

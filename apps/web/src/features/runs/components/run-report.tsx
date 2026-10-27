@@ -57,11 +57,15 @@ export function RunReport({ report }: { report: Report }) {
       />
       <Tile label="Paid calls" value={report.paid_calls} />
       <Tile
-        label="Cost"
+        label="Cost reported"
         value={report.reported_cost === null ? "–" : formatCost(report.reported_cost)}
-        note="Reported by OpenRouter"
+        note="Billed by OpenRouter"
       />
-      <Tile label="Cost" value={formatCost(report.estimated_cost)} note="Estimated" />
+      <Tile
+        label="Cost estimated"
+        value={formatCost(report.estimated_cost)}
+        note="From our price list"
+      />
     </dl>
   );
 }
