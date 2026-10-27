@@ -120,7 +120,7 @@ export function SnapshotsTab({ runId, initialPage, timeZone, live }: TabProps) {
 
 const documentColumn = createDataTableColumnHelper<DocumentOutput>();
 
-function documentColumns(timeZone: string) {
+function documentColumns() {
   return documentColumn.columns([
     documentColumn.accessor("document_type", {
       header: "Type",
@@ -147,12 +147,12 @@ function documentColumns(timeZone: string) {
 }
 
 /** The documents the run's classifications found, by type. */
-export function DocumentsTab({ runId, initialPage, timeZone, live }: TabProps) {
+export function DocumentsTab({ runId, initialPage, live }: TabProps) {
   const { page, setPage, listPage, isStale } = useRunTabPage("documents", initialPage);
   const { data } = useSuspenseQuery(runDocumentsQuery(browserApi, runId, listPage, live));
   return (
     <DataTable<DocumentOutput>
-      columns={documentColumns(timeZone)}
+      columns={documentColumns()}
       data={data.items}
       total={data.total}
       page={page}
