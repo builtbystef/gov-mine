@@ -33,6 +33,7 @@ from gov_mine.modules.crawl.models import (
 )
 from gov_mine.modules.ingest import service as ingest
 from gov_mine.modules.institutions.models import Institution
+from gov_mine.shared import addresses
 from gov_mine.shared.exceptions import NotFoundError
 from gov_mine.shared.robots import robots_allows, robots_crawl_delay, robots_url
 from gov_mine.shared.sitemaps import parse_sitemap
@@ -61,6 +62,9 @@ MAX_SITEMAPS = 50
 # How the crawl waits out a host's delay. Tests that are not about pacing swap it for one that
 # does not wait.
 sleep = asyncio.sleep
+# How the fence finds the addresses a host name stands for. Tests swap it for one that does not
+# ask DNS.
+resolve = addresses.resolve
 
 # Whether any job of the run other than `crawl.finish` is waiting or running. Every job of a
 # run carries its `run_id`; a job queues its follow-ups in its own transaction, before it is
@@ -253,6 +257,25 @@ def _normalised(url: str) -> str | None:
         return None
 
 
+async def address_refusal(url: str) -> tuple[FetchOutcome, str] | None:
+    """Why the fence turns `url` down for where it would connect, or None: a host written as an
+    address that is not public, before any DNS, or a name any of whose addresses is not public.
+    A name that does not resolve is not refused here; its request fails."""
+    host = host_of(url)
+    literal = addresses.literal_address(host)
+    if literal is not None:
+        found = [literal]
+    else:
+        try:
+            found = await resolve(host)
+        except OSError as exc:
+            logger.info("%s did not resolve: %s", host, exc)
+            return None
+    if not all(addresses.is_public(address) for address in found):
+        return FetchOutcome.SKIPPED_SCOPE, "private_address"
+    return None
+
+
 def refusal(
     url: str, policy: CrawlPolicy, website_url: str, depth: int
 ) -> tuple[FetchOutcome, str] | None:
@@ -344,8 +367,9 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
     """Fetch a webpage found `depth` links from a seed and log the attempt as a `fetches` row.
 
     Once the run has sent its `--limit` requests, nothing happens and None is returned. A URL
-    the fence or the host's robots.txt refuses gets its row and no request; reading robots.txt
-    writes no row and does not count toward `--limit`. Otherwise a 200 hands the body to
+    the fence (its address first, then the host policy, prefix and depth) or the host's
+    robots.txt refuses gets its row and no request; reading robots.txt writes no row and does
+    not count toward `--limit`. Otherwise a 200 hands the body to
     `ingest.store`: `fetched` with the new snapshot, or `unchanged` when the bytes are the ones
     already kept; an HTML page on a `crawl` host then queues its links one link deeper (what a
     `files_only` host serves is never followed, whatever its type). Any other status is
@@ -363,7 +387,9 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
     webpage = await session.get_one(Webpage, webpage_id)
     domain = await session.get_one(Domain, webpage.domain_id)
     fetch = Fetch(crawl_run_id=run.id, webpage_id=webpage.id, requested_at=utcnow())
-    refused = refusal(webpage.url, domain.crawl_policy, institution.website_url, depth)
+    refused = await address_refusal(webpage.url)
+    if refused is None:
+        refused = refusal(webpage.url, domain.crawl_policy, institution.website_url, depth)
     if refused is None:
         refused = await robots_refusal(session, http, run, domain, webpage.url)
     if refused is not None:
@@ -478,6 +504,7 @@ __all__ = [
     "FINISH_TASK",
     "MAX_DEPTH",
     "START_TASK",
+    "address_refusal",
     "ensure_domain",
     "ensure_webpage",
     "fetch_page",

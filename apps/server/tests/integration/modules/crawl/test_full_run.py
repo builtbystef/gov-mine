@@ -16,6 +16,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from datetime import timedelta
 from importlib.metadata import version
+from ipaddress import ip_address
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
@@ -113,6 +114,23 @@ def instant_waits(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture
 def real_waits(instant_waits: None, monkeypatch: pytest.MonkeyPatch) -> None:  # noqa: ARG001
     monkeypatch.setattr(service, "sleep", asyncio.sleep)
+
+
+# Where the faked DNS sends a host it is not told about: a public address.
+PUBLIC_ADDRESS = "93.184.215.14"
+
+
+@pytest.fixture(autouse=True)
+def dns(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[str]]:
+    """The fence's DNS, faked: a test lists a host's addresses here, and any other host has
+    `PUBLIC_ADDRESS`."""
+    answers: dict[str, list[str]] = {}
+
+    async def resolve(host: str) -> list[Any]:
+        return [ip_address(address) for address in answers.get(host, [PUBLIC_ADDRESS])]
+
+    monkeypatch.setattr(service, "resolve", resolve)
+    return answers
 
 
 @dataclass
@@ -761,6 +779,59 @@ def test_every_link_to_a_blocked_host_is_refused_without_a_request(
     )
     (domain,) = rows(database, "SELECT crawl_policy FROM domains WHERE name = 'tracker.example'")
     assert domain["crawl_policy"] == "blocked"
+
+
+def test_every_link_to_a_private_address_is_refused_without_a_request(
+    crawl_settings: Settings, database: Engine, dns: dict[str, list[str]]
+):
+    with database.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO domains (id, name, crawl_policy, crawl_delay_ms, created_at)"
+                " VALUES (gen_random_uuid(), 'admin.example', 'blocked', 1000, now())"
+            )
+        )
+    dns["intranet.example"] = ["10.1.2.3"]
+    dns["admin.example"] = ["192.168.0.10"]
+    # One of its addresses is public, the other loopback: it could reach either.
+    dns["mixed.example"] = [PUBLIC_ADDRESS, "::1"]
+    run_id = create_run()
+    private = [
+        "http://127.0.0.1/",
+        "http://10.0.0.5/",
+        "http://192.168.1.1/",
+        "http://169.254.169.254/",
+        "http://[::1]/",
+        "http://[fe80::1]/",
+        "https://intranet.example/report.pdf",
+        "https://admin.example/",
+        "https://mixed.example/report.pdf",
+    ]
+    website = Website(
+        {
+            f"{SITE}/": page(*private, "https://files.example/report.pdf"),
+            "https://files.example/report.pdf": b"%PDF-1.4",
+            **dict.fromkeys(private, b"%PDF-1.4"),
+        }
+    )
+
+    asyncio.run(crawl(crawl_settings, run_id, website))
+
+    # Not even their robots.txt is asked for.
+    assert sorted(website.requests[1:]) == sorted(
+        [
+            f"{SITE}/",
+            f"{SITE}/robots.txt",
+            "https://files.example/report.pdf",
+            "https://files.example/robots.txt",
+        ]
+    )
+    refused = {
+        url: (fetch["outcome"], fetch["reason"], fetch["duration_ms"], fetch["http_status"])
+        for url, fetch in fetches_by_url(database, run_id).items()
+        if fetch["outcome"] != "fetched"
+    }
+    assert refused == dict.fromkeys(private, ("skipped_scope", "private_address", None, None))
 
 
 def test_a_host_changed_to_crawl_is_followed_on_the_next_run(
