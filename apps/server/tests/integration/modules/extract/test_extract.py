@@ -224,6 +224,44 @@ def test_a_news_document_is_extracted_with_a_cited_record(
     assert (current.record_snapshot_id, current.data) == (second.id, second.data)
 
 
+async def _date(db: Database, run_id: uuid.UUID, day: datetime) -> None:
+    """The run's cutoff as a run created on 2026-10-27 records it, and the document's date."""
+    async with db.session() as session:
+        run = await session.get_one(CrawlRun, run_id)
+        run.settings = {**run.settings, "cutoff": "2021-10-27"}
+        document = await session.scalar(select(Document))
+        assert document is not None
+        document.document_date = day
+        await session.commit()
+
+
+def test_a_document_dated_before_the_runs_cutoff_is_not_extracted(
+    db: Database, object_store: MemoryObjectStore, openrouter: OpenRouter
+):
+    run_id = db.run(_document, db, RELEASE, DocumentType.PRESS_RELEASES)
+    db.run(_date, db, run_id, datetime(2019, 6, 1, tzinfo=UTC))
+
+    db.run(_store, db, object_store, run_id, RELEASE, RELEASE_PAGE)
+
+    assert openrouter.requests == []
+    assert db.run(_rows, db, Extraction) == []
+
+
+def test_a_document_updated_within_the_window_is_extracted_and_takes_the_later_date(
+    db: Database, object_store: MemoryObjectStore, openrouter: OpenRouter
+):
+    run_id = db.run(_document, db, RELEASE, DocumentType.PRESS_RELEASES)
+    db.run(_date, db, run_id, datetime(2024, 1, 1, tzinfo=UTC))
+
+    db.run(_store, db, object_store, run_id, RELEASE, RELEASE_PAGE)
+
+    assert len(openrouter.requests) == 1
+    assert len(db.run(_rows, db, Record)) == 1
+    # The model read 2026-10-01, later than the document's date.
+    [document] = db.run(_rows, db, Document)
+    assert document.document_date == datetime(2026, 10, 1, tzinfo=UTC)
+
+
 def test_a_staff_directory_yields_a_contact_per_person(
     db: Database, object_store: MemoryObjectStore, openrouter: OpenRouter
 ):

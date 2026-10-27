@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
@@ -28,6 +28,9 @@ class RunSettings(BaseModel):
     # The replay server's address on a replay run, which sends it every request; None on a live
     # run.
     replay: str | None = None
+    # The five-year window: documents dated before this day (the run's creation day minus five
+    # years) are kept and not extracted; None on older runs.
+    cutoff: date | None = None
 
 
 class RunCreate(BaseModel):

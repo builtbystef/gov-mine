@@ -882,6 +882,8 @@ export interface components {
             } | null;
             /** Replay */
             replay?: string | null;
+            /** Cutoff */
+            cutoff?: string | null;
         };
         /**
          * RunStatus

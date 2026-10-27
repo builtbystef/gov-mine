@@ -15,7 +15,7 @@ import uuid
 from collections import Counter
 from contextlib import suppress
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from importlib.metadata import version
 from ipaddress import ip_address
 from pathlib import Path
@@ -41,6 +41,7 @@ from gov_mine.integrations.storage.memory import MemoryObjectStore
 from gov_mine.main import create_app
 from gov_mine.modules.crawl import service
 from gov_mine.modules.crawl.models import CrawlRun, RunStatus
+from gov_mine.modules.extract.service import window_cutoff
 from gov_mine.resources import build_resources, worker_context
 from gov_mine.shared.logs import ContextFilter, JsonFormatter
 from gov_mine.shared.urls import normalise_url
@@ -64,6 +65,8 @@ EXTRACTORS = {
     t: f"model:{t}@1"
     for t in ("project", "news_item", "meeting", "contact", "rfp", "grant", "contract")
 }
+# The five-year window's cutoff a run created today records (028).
+CUTOFF = window_cutoff(datetime.now(UTC).date()).isoformat()
 
 
 def invoke(*args: str) -> tuple[int, str]:
@@ -355,6 +358,7 @@ def test_a_full_run_crawls_the_homepage_into_a_snapshot(crawl_settings: Settings
         "max_file_bytes": 100 * 1024 * 1024,
         "extractors": EXTRACTORS,
         "replay": None,
+        "cutoff": CUTOFF,
     }
     assert run["institution_id"] == institution["id"]
     queued = rows(database, "SELECT task_name, args FROM procrastinate_jobs")
@@ -602,6 +606,7 @@ def test_run_create_limit_caps_the_requests_the_run_sends(
         "max_file_bytes": 100 * 1024 * 1024,
         "extractors": EXTRACTORS,
         "replay": None,
+        "cutoff": CUTOFF,
     }
     pages = {f"{SITE}/": page("https://elsewhere.example/", *(f"/p/{n}" for n in range(10)))}
     pages |= {f"{SITE}/p/{n}": page(*(f"/p/{n}/{m}" for m in range(10))) for n in range(10)}

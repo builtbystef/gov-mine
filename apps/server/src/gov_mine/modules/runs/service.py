@@ -78,7 +78,8 @@ async def create_run(  # noqa: PLR0913 - the run's settings, as keywords
             max_file_bytes=crawl.MAX_FILE_BYTES,
             extractors=extract.extractor_versions(),
             replay=replay,
-        ).model_dump(),
+            cutoff=extract.window_cutoff(utcnow().date()),
+        ).model_dump(mode="json"),
     )
     session.add(run)
     await session.flush()

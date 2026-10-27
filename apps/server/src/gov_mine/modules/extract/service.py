@@ -16,11 +16,12 @@ from pydantic_ai.exceptions import ModelAPIError, UnexpectedModelBehavior
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
+from gov_mine.db.base import utcnow
 from gov_mine.integrations.ai import PROVIDER, create_model, extract_model_settings, usages
 from gov_mine.jobs import registry
 from gov_mine.jobs.tasks import defer
 from gov_mine.modules.classify.models import Document
-from gov_mine.modules.crawl.models import Webpage
+from gov_mine.modules.crawl.models import CrawlRun, Webpage
 from gov_mine.modules.extract.models import (
     Citation,
     Extraction,
@@ -120,6 +121,8 @@ async def queue_document(
     document = await session.scalar(select(Document).where(Document.webpage_id == webpage_id))
     if document is None or document.document_type not in DOCUMENT_RECORD_TYPES:
         return False
+    if await _before_window(session, document, run_id):
+        return False
     await defer(
         session,
         registry.tasks[EXTRACT_TASK],
@@ -127,6 +130,22 @@ async def queue_document(
         document_id=str(document.id),
     )
     return True
+
+
+async def _before_window(
+    session: AsyncSession, document: Document, run_id: uuid.UUID | None
+) -> bool:
+    """Whether the document's latest date is before the run's cutoff (today's outside a run or
+    on an older run). An undated document is within the window."""
+    rows = await list_current_records(session, document_id=document.id)
+    dated = latest_date(document.document_date, (row.data for row in rows))
+    if dated is None:
+        return False
+    run = None if run_id is None else await session.get(CrawlRun, run_id)
+    cutoff = None if run is None else run.settings.get("cutoff")
+    if cutoff is None:
+        return dated < window_cutoff(utcnow().date())
+    return dated < date.fromisoformat(cutoff)
 
 
 async def _latest_snapshot(session: AsyncSession, webpage_id: uuid.UUID) -> WebpageSnapshot | None:
@@ -223,7 +242,7 @@ async def extract_document(  # noqa: PLR0913 - the job's inputs and what it work
         raise NotFoundError(f"No document {document_id}")
     record_data = DOCUMENT_RECORD_TYPES.get(document.document_type)
     model = create_model(settings, settings.extract_model, http_client=http_client)
-    if record_data is None or model is None:
+    if record_data is None or model is None or await _before_window(session, document, run_id):
         return None
     extractor = extractor_name(record_data.record_type)
     snapshot = await _latest_snapshot(session, document.webpage_id)
@@ -320,9 +339,10 @@ async def _write_records(  # noqa: PLR0913
         )
     if invalid and len(invalid) == len(drafts):
         extraction.error = "\n".join(invalid)
-    stated = output.document_date
-    if document.document_date is None and stated is not None:
-        document.document_date = datetime.combine(stated, time(), tzinfo=UTC)
+    if output.document_date is not None:
+        stated = datetime.combine(output.document_date, time(), tzinfo=UTC)
+        if document.document_date is None or stated > document.document_date:
+            document.document_date = stated
 
 
 async def _upsert(  # noqa: PLR0913

@@ -2378,6 +2378,18 @@
               }
             ],
             "title": "Replay"
+          },
+          "cutoff": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cutoff"
           }
         },
         "type": "object",
