@@ -107,6 +107,13 @@ _IN_RUN = text(
 )
 # Requests the run has sent: a refusal's row has no duration.
 _REQUESTS_SENT = select(func.count()).select_from(Fetch).where(Fetch.duration_ms.is_not(None))
+# The run's fetches still waiting for a worker, dropped once it has sent its `--limit` requests:
+# each would otherwise wait its turn on its host only to find the limit reached.
+_DROP_WAITING_FETCHES = text(
+    "DELETE FROM procrastinate_jobs"
+    " WHERE status = 'todo' AND task_name = :fetch AND args->>'run_id' = :run_id"
+    " RETURNING id"
+)
 
 
 def host_of(url: str) -> str:
@@ -466,7 +473,8 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
 ) -> Fetch | None:
     """Fetch a webpage found `depth` links from a seed and log the attempt as a `fetches` row.
 
-    Once the run has sent its `--limit` requests, nothing happens and None is returned. A URL
+    Once the run has sent its `--limit` requests, nothing happens and None is returned; the
+    request that reaches the limit queues no links and drops the run's waiting fetches. A URL
     the fence (its address first, then the host policy, prefix and depth, the host's
     robots.txt, and the type its extension names) refuses gets its row and no request; reading
     robots.txt writes no row and does not count toward `--limit`. Otherwise one GET is sent and
@@ -482,12 +490,14 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
     # A run from before the cap was recorded gets today's.
     max_bytes: int = run.settings.get("max_file_bytes", MAX_FILE_BYTES)
     limit = run.settings.get("limit")
+    last_request = False
     if limit is not None:
         await lock_run(session, run.id)
         sent = await session.scalar(_REQUESTS_SENT.where(Fetch.crawl_run_id == run.id)) or 0
         if sent >= limit:
             logger.info("Run %s has sent its %d requests: not fetched", run.id, limit)
             return None
+        last_request = sent + 1 >= limit
     institution = await session.get_one(Institution, run.institution_id)
     webpage = await session.get_one(Webpage, webpage_id)
     domain = await session.get_one(Domain, webpage.domain_id)
@@ -516,9 +526,23 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
         fetch.outcome = (
             FetchOutcome.FETCHED if fetch.snapshot_id is not None else FetchOutcome.UNCHANGED
         )
-        if domain.crawl_policy is CrawlPolicy.CRAWL and got.media_type in HTML_MEDIA_TYPES:
+        if (
+            not last_request
+            and domain.crawl_policy is CrawlPolicy.CRAWL
+            and got.media_type in HTML_MEDIA_TYPES
+        ):
             links = find_links(got.body.decode(got.encoding, errors="replace"), webpage.url)
             await queue_links(session, run.id, webpage, links, depth + 1)
+    if last_request:
+        dropped = await session.scalars(
+            _DROP_WAITING_FETCHES, {"fetch": FETCH_TASK, "run_id": str(run.id)}
+        )
+        logger.info(
+            "Run %s reached its %d requests: %d waiting fetches dropped",
+            run.id,
+            limit,
+            len(dropped.all()),
+        )
     session.add(fetch)
     await session.flush()
     return fetch

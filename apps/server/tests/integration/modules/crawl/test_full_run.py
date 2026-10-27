@@ -577,7 +577,7 @@ def test_urls_outside_the_website_prefix_are_not_requested(
 
 
 def test_run_create_limit_caps_the_requests_the_run_sends(
-    crawl_settings: Settings, database: Engine
+    crawl_settings: Settings, database: Engine, caplog: pytest.LogCaptureFixture
 ):
     run_id = create_run("--limit", "3")
     (run,) = rows(database, "SELECT settings FROM crawl_runs")
@@ -591,7 +591,8 @@ def test_run_create_limit_caps_the_requests_the_run_sends(
     pages |= {f"{SITE}/p/{n}": page(*(f"/p/{n}/{m}" for m in range(10))) for n in range(10)}
     website = Website(pages)
 
-    asyncio.run(crawl(crawl_settings, run_id, website))
+    with caplog.at_level(logging.INFO):
+        asyncio.run(crawl(crawl_settings, run_id, website))
 
     (run,) = rows(database, "SELECT status FROM crawl_runs")
     assert run["status"] == "finished"
@@ -601,6 +602,10 @@ def test_run_create_limit_caps_the_requests_the_run_sends(
     # The rest of the eleven links found wrote nothing, but a refusal, which costs no request.
     assert {fetch["outcome"] for fetch in fetches} <= {"fetched", "skipped_scope"}
     assert len(rows(database, "SELECT id FROM webpages")) > len(fetches)
+    # The third request dropped the waiting fetches: at most the job the other worker had
+    # already taken ran to find the limit reached.
+    assert "waiting fetches dropped" in caplog.text
+    assert caplog.text.count("requests: not fetched") <= 1
 
 
 def sitemap_urls() -> list[str]:
