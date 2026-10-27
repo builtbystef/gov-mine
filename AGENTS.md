@@ -14,4 +14,5 @@ Scripts run through Vite+ (`vp`), not plain pnpm or npx.
 
 - A model change needs an Alembic migration (`cd apps/server && uv run alembic revision --autogenerate -m "..."`); CI fails without one.
 - A change to API request or response shapes needs `vp run generate`. The client in `packages/api-client/src/generated/` is never edited by hand.
+- Commit straight to `main` and never create branches, even when a skill says to branch first.
 - Dependencies are often newer than your training data. Check APIs against the installed source in `node_modules/` or `.venv/`, not memory.
