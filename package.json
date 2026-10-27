@@ -1,0 +1,38 @@
+{
+  "name": "gov-mine",
+  "private": true,
+  "license": "MIT",
+  "author": "builtbystef",
+  "type": "module",
+  "scripts": {
+    "check": "vp run check:ts && vp run check:py",
+    "check:fix": "vp run check:ts --fix && vp run check:py:fix",
+    "check:ts": "vp check",
+    "check:py": "uv run ruff format --check . && uv run ruff check . && uv run ty check",
+    "check:generated": "vp run -r generate:check",
+    "generate": "vp run -r generate",
+    "check:py:fix": "uv run ruff check --fix . && uv run ruff format . && uv run ty check",
+    "test": "vp run test:ts && vp run test:py",
+    "test:ts": "vp test",
+    "test:py": "uv run pytest",
+    "build": "vp run -r build",
+    "db:down": "cd apps/server && docker compose down",
+    "db:migrate": "cd apps/server && uv run alembic upgrade head",
+    "dev": "concurrently --kill-others-on-fail --prefix-colors \"cyan,magenta,green\" --names api,worker,web \"pnpm run dev:api\" \"pnpm run dev:worker\" \"pnpm --filter @gov-mine/web run dev\"",
+    "dev:api": "cd apps/server && uv run fastapi dev",
+    "dev:worker": "cd apps/server && uv run watchfiles --target-type command gov-mine-worker src",
+    "dev:web": "cd apps/web && vp run dev",
+    "ci": "vp run check && vp run check:generated && vp run test && vp run -r build"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "concurrently": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@12.15.0"
+}

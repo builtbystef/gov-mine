@@ -1,0 +1,71 @@
+[project]
+name = "gov-mine-server"
+version = "0.0.0"
+description = "The API, the worker, and the CLI"
+requires-python = ">=3.14"
+license = "MIT"
+authors = [{ name = "builtbystef" }]
+dependencies = [
+  "aiobotocore>=3.9,<4",
+  "alembic>=1.19.1,<1.21",
+  # 0.x: minor bumps can break, so pin the minor. Starlette is left to FastAPI.
+  "fastapi[standard-no-fastapi-cloud-cli]>=0.160,<0.161",
+  # The crawler's client: HTTP/2 and conditional requests.
+  "httpx[http2]>=0.28.1,<0.29",
+  "logfire[fastapi,sqlalchemy]>=4.41,<6",
+  # HTML to markdown, the converter MarkItDown itself uses for HTML.
+  "markdownify>=1.2.3,<2",
+  # PDF and office files to markdown, and the plugin that reads scans.
+  "markitdown[all]>=0.1.9,<0.2",
+  "markitdown-ocr>=0.1.2,<0.2",
+  # The job queue, on PostgreSQL. A bump may need a migration: see Adding things in apps/server/README.md.
+  "procrastinate>=3.9,<4",
+  "psycopg[binary]>=3.3.5,<4",
+  "pydantic-ai-slim[openai]>=2.40,<3",
+  "pydantic-settings>=2.13.1,<3",
+  # HTML parsing for compaction.
+  "selectolax>=1.0.2,<2",
+  "sqlalchemy[asyncio]>=2.1.6,<2.2",
+  # The CLI.
+  "typer>=0.27.3,<0.28",
+]
+
+[dependency-groups]
+# Starlette >= 1.6 TestClient warns unless httpx2 is installed.
+dev = ["httpx2>=2.12,<3", "types-aiobotocore-s3>=3.9,<4"]
+
+[project.scripts]
+gov-mine-worker = "gov_mine.jobs.worker:main"
+
+[tool.fastapi]
+# The ASGI app, built from the environment. Everything else gets its settings as
+# an argument.
+entrypoint = "gov_mine.asgi:app"
+
+[tool.uv.build-backend]
+# The distribution is gov-mine-server; the import package is gov_mine.
+module-name = "gov_mine"
+
+[build-system]
+requires = ["uv_build>=0.12.3,<0.13.0"]
+build-backend = "uv_build"
+
+
+[tool.alembic]
+# `uv run alembic ...` from apps/server, or `vp run db:migrate`. URL: alembic/env.py.
+script_location = "%(here)s/alembic"
+# Date prefix keeps versions/ in order.
+file_template = "%%(year)d_%%(month).2d_%%(day).2d_%%(hour).2d%%(minute).2d-%%(rev)s_%%(slug)s"
+
+# Lint and format new migrations.
+[[tool.alembic.post_write_hooks]]
+name = "ruff-check"
+type = "module"
+module = "ruff"
+options = "check --fix REVISION_SCRIPT_FILENAME"
+
+[[tool.alembic.post_write_hooks]]
+name = "ruff-format"
+type = "module"
+module = "ruff"
+options = "format REVISION_SCRIPT_FILENAME"

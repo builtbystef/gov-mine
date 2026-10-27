@@ -1,0 +1,80 @@
+# Local PostgreSQL and RustFS for apps/server: `vp run db:up`. Credentials match
+# the default settings in src/gov_mine/config.py and the CI services.
+name: gov-mine
+
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gov_mine
+      POSTGRES_PASSWORD: gov_mine
+      POSTGRES_DB: gov_mine
+    ports:
+      # Loopback only.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # PostgreSQL 18 stores data under /var/lib/postgresql/<major>, not .../data.
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready --username gov_mine --dbname gov_mine"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # S3-compatible object storage for snapshots. The browser downloads from
+  # port 9000 directly, through presigned URLs the API signs.
+  # Console (bucket browser) at http://localhost:9001, same credentials.
+  storage:
+    image: rustfs/rustfs:1.0.4
+    restart: unless-stopped
+    environment:
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      RUSTFS_ACCESS_KEY: rustfsadmin
+      RUSTFS_SECRET_KEY: rustfsadmin
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - storage-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # Creates the bucket the API expects and lets the web app's origin PUT and
+  # GET objects through presigned URLs, then exits. RustFS ships no client, so
+  # the AWS CLI does it. Rerun with `docker compose up storage-init`.
+  storage-init:
+    image: amazon/aws-cli:2.38.5
+    depends_on:
+      storage:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: rustfsadmin
+      AWS_SECRET_ACCESS_KEY: rustfsadmin
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ENDPOINT_URL: http://storage:9000
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        aws s3api head-bucket --bucket gov-mine 2>/dev/null || aws s3api create-bucket --bucket gov-mine
+        aws s3api put-bucket-cors --bucket gov-mine --cors-configuration '{
+          "CORSRules": [{
+            "AllowedOrigins": ["http://localhost:3000"],
+            "AllowedMethods": ["GET", "PUT", "HEAD"],
+            "AllowedHeaders": ["*"],
+            "ExposeHeaders": ["ETag"],
+            "MaxAgeSeconds": 3000
+          }]
+        }'
+
+volumes:
+  db-data:
+  storage-data:

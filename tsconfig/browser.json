@@ -1,0 +1,9 @@
+{
+  // Browser applications (bundled by Vite or similar).
+  "extends": "./base.json",
+  "compilerOptions": {
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    // Block auto-inclusion of the workspace-root @types/node.
+    "types": []
+  }
+}
