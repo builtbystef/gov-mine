@@ -77,6 +77,11 @@ MAX_FILE_BYTES = 100 * 1024 * 1024
 MAX_DEPTH = 50
 # The longest URL `webpages.url` holds; a longer link is not followed.
 MAX_URL_LENGTH = 2048
+# A request that times out or gets a 429 or a 5xx is tried again this many times within the
+# fetch, waiting this long before the first retry and twice as long before each next one.
+RETRIES = 3
+RETRY_BACKOFF_SECONDS = 1.0
+FAILED_OUTCOMES = frozenset({FetchOutcome.FAILED_HTTP, FetchOutcome.FAILED_TIMEOUT})
 # Where a run looks for the host's sitemap.
 SITEMAP_PATH = "/sitemap.xml"
 # The most sitemap files a run reads, the index included: an index can point to thousands.
@@ -480,12 +485,16 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
     is handed to `ingest.store`: `fetched` with the new snapshot, or `unchanged` when the bytes
     are the ones already kept; an HTML page on a `crawl` host then queues its links one link
     deeper (what a `files_only` host serves is never followed, whatever its type). Any other
-    status is `failed_http`, and a timeout `failed_timeout`. A request, robots.txt's included,
-    first waits out the host's delay; a sent request's `requested_at` is when it was sent."""
+    status is `failed_http`, and a timeout `failed_timeout`; a timeout, a 429 or a 5xx is tried
+    again up to `RETRIES` times (within `--limit`), `RETRY_BACKOFF_SECONDS` doubling each time,
+    each try its own row. A 404 sets the webpage's `missing_since`, a 200 clears it. A request,
+    robots.txt's included, first waits out the host's delay; a sent request's `requested_at` is
+    when it was sent. Returns the last row written."""
     run = await get_run(session, run_id)
     # A run from before the cap was recorded gets today's.
     max_bytes: int = run.settings.get("max_file_bytes", MAX_FILE_BYTES)
     limit = run.settings.get("limit")
+    sent = 0
     last_request = False
     if limit is not None:
         await lock_run(session, run.id)
@@ -493,44 +502,41 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
         if sent >= limit:
             logger.info("Run %s has sent its %d requests: not fetched", run.id, limit)
             return None
-        last_request = sent + 1 >= limit
     institution = await session.get_one(Institution, run.institution_id)
     webpage = await session.get_one(Webpage, webpage_id)
     domain = await session.get_one(Domain, webpage.domain_id)
     fetch = Fetch(crawl_run_id=run.id, webpage_id=webpage.id, requested_at=utcnow())
-    refused = await address_refusal(webpage.url)
-    if refused is None:
-        refused = refusal(webpage.url, domain.crawl_policy, institution.website_url, depth)
+    refused = await address_refusal(webpage.url) or refusal(
+        webpage.url, domain.crawl_policy, institution.website_url, depth
+    )
     if refused is None:
         refused = await robots_refusal(session, http, run, domain, webpage.url)
-    if refused is None:
-        refused = type_refusal(webpage.url)
+    refused = refused or type_refusal(webpage.url)
     if refused is not None:
         fetch.outcome, fetch.reason = refused
         session.add(fetch)
         await session.flush()
         return fetch
-    fetch.requested_at = await wait_for_host(session, domain.id)
-    started = time.perf_counter()
-    got = await download(http, webpage.url, max_bytes)
-    fetch.duration_ms = _ms_since(started)
-    fetch.http_status = got.http_status
-    if got.dropped is not None:
-        fetch.outcome, fetch.reason = got.dropped
-    else:
-        fetch.snapshot_id = await ingest.store(
-            session, store, webpage.id, got.body, got.media_type, run_id=run.id
+    tries = 1 + RETRIES if limit is None else min(1 + RETRIES, limit - sent)
+    for attempt in range(tries):
+        if attempt:
+            await sleep(RETRY_BACKOFF_SECONDS * 2 ** (attempt - 1))
+            fetch = Fetch(crawl_run_id=run.id, webpage_id=webpage.id)
+        last_request = limit is not None and sent + attempt + 1 >= limit
+        follow = not last_request and domain.crawl_policy is CrawlPolicy.CRAWL
+        await _send(
+            session,
+            http,
+            store,
+            fetch=fetch,
+            webpage=webpage,
+            depth=depth,
+            max_bytes=max_bytes,
+            follow=follow,
         )
-        fetch.outcome = (
-            FetchOutcome.FETCHED if fetch.snapshot_id is not None else FetchOutcome.UNCHANGED
-        )
-        if (
-            not last_request
-            and domain.crawl_policy is CrawlPolicy.CRAWL
-            and got.media_type in HTML_MEDIA_TYPES
-        ):
-            links = find_links(got.body.decode(got.encoding, errors="replace"), webpage.url)
-            await queue_links(session, run.id, webpage, links, depth + 1)
+        if not _transient(fetch):
+            break
+        logger.info("%s try %d: %s %s", webpage.url, attempt + 1, fetch.outcome, fetch.http_status)
     if last_request:
         dropped = await session.scalars(
             _DROP_WAITING_FETCHES, {"fetch": FETCH_TASK, "run_id": str(run.id)}
@@ -544,6 +550,44 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
     session.add(fetch)
     await session.flush()
     return fetch
+
+
+async def _send(  # noqa: PLR0913 - one try of fetch_page, with what it works with
+    session: AsyncSession,
+    http: httpx.AsyncClient,
+    store: ObjectStore,
+    *,
+    fetch: Fetch,
+    webpage: Webpage,
+    depth: int,
+    max_bytes: int,
+    follow: bool,
+) -> None:
+    """One try at `webpage`, once its host's delay has passed, logged in `fetch`: what it kept,
+    and, when `follow`, the links of an HTML page queued one link deeper."""
+    fetch.requested_at = await wait_for_host(session, webpage.domain_id)
+    started = time.perf_counter()
+    got = await download(http, webpage.url, max_bytes)
+    fetch.duration_ms = _ms_since(started)
+    fetch.http_status = got.http_status
+    if got.http_status == httpx.codes.NOT_FOUND:
+        webpage.missing_since = webpage.missing_since or fetch.requested_at
+    elif got.http_status == httpx.codes.OK:
+        webpage.missing_since = None
+    if got.dropped is not None:
+        fetch.outcome, fetch.reason = got.dropped
+    else:
+        fetch.snapshot_id = await ingest.store(
+            session, store, webpage.id, got.body, got.media_type, run_id=fetch.crawl_run_id
+        )
+        fetch.outcome = (
+            FetchOutcome.FETCHED if fetch.snapshot_id is not None else FetchOutcome.UNCHANGED
+        )
+        if follow and got.media_type in HTML_MEDIA_TYPES:
+            links = find_links(got.body.decode(got.encoding, errors="replace"), webpage.url)
+            await queue_links(session, fetch.crawl_run_id, webpage, links, depth + 1)
+    session.add(fetch)
+    await session.flush()
 
 
 async def queue_links(
@@ -600,16 +644,51 @@ async def queue_links(
 
 async def finish_run(session: AsyncSession, run_id: uuid.UUID) -> bool:
     """Mark a running run `finished` once none of its jobs is waiting or running; until then,
-    queue another look in `FINISH_POLL`. True when the run was finished."""
+    queue another look in `FINISH_POLL`. A full run whose homepage failed is marked `failed`
+    instead, with why in its `error`; a failure on any other page does not fail the run. True
+    when the run was ended."""
     run = await get_run(session, run_id)
     if run.status is not RunStatus.RUNNING:
         return False
     if await session.scalar(_RUN_HAS_WORK, {"finish": FINISH_TASK, "run_id": str(run.id)}):
         await queue(session, FINISH_TASK, schedule_in=FINISH_POLL, run_id=str(run.id))
         return False
-    run.status = RunStatus.FINISHED
+    run.error = await homepage_failure(session, run)
+    run.status = RunStatus.FAILED if run.error else RunStatus.FINISHED
     run.finished_at = utcnow()
     return True
+
+
+def _transient(fetch: Fetch) -> bool:
+    """Whether the try failed in a way the next try may not: a timeout, a 429 or a 5xx."""
+    if fetch.outcome is FetchOutcome.FAILED_TIMEOUT:
+        return True
+    status = fetch.http_status
+    return (
+        fetch.outcome is FetchOutcome.FAILED_HTTP
+        and status is not None
+        and (status == httpx.codes.TOO_MANY_REQUESTS or status >= httpx.codes.INTERNAL_SERVER_ERROR)
+    )
+
+
+async def homepage_failure(session: AsyncSession, run: CrawlRun) -> str | None:
+    """Why a full run failed, or None: its homepage's last try in the run failed, so the run
+    has no copy of it."""
+    if run.settings.get("mode") != "full":
+        return None
+    institution = await session.get_one(Institution, run.institution_id)
+    url = normalise_url(institution.website_url)
+    last = await session.scalar(
+        select(Fetch)
+        .join(Webpage, Webpage.id == Fetch.webpage_id)
+        .where(Fetch.crawl_run_id == run.id, Webpage.url == url)
+        .order_by(Fetch.requested_at.desc())
+        .limit(1)
+    )
+    if last is None or last.outcome not in FAILED_OUTCOMES:
+        return None
+    detail = f"HTTP {last.http_status}" if last.http_status is not None else last.reason
+    return f"The homepage {url} could not be fetched: {last.outcome} ({detail})"
 
 
 def _ms_since(started: float) -> int:
@@ -622,6 +701,8 @@ __all__ = [
     "FINISH_TASK",
     "MAX_DEPTH",
     "MAX_FILE_BYTES",
+    "RETRIES",
+    "RETRY_BACKOFF_SECONDS",
     "START_TASK",
     "Download",
     "address_refusal",
@@ -631,6 +712,7 @@ __all__ = [
     "fetch_page",
     "finish_run",
     "get_run",
+    "homepage_failure",
     "host_of",
     "lock_run",
     "media_type_of",

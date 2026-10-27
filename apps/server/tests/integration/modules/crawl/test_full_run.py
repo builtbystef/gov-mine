@@ -1227,3 +1227,77 @@ def test_a_response_of_an_unsupported_type_or_over_100_mb_is_dropped_before_its_
     # One GET each.
     assert set(website.methods) == {"GET"}
     assert sorted(website.page_requests) == sorted([f"{SITE}/", *responses])
+
+
+def attempts(engine: Engine, run_id: str) -> dict[str, list[tuple[str, int | None]]]:
+    """The run's tries at each URL, in order, as (outcome, HTTP status)."""
+    tries: dict[str, list[tuple[str, int | None]]] = {}
+    for fetch in rows(
+        engine,
+        "SELECT f.outcome, f.http_status, w.url FROM fetches f"
+        " JOIN webpages w ON w.id = f.webpage_id WHERE f.crawl_run_id = :id"
+        " ORDER BY f.requested_at",
+        id=run_id,
+    ):
+        tries.setdefault(fetch["url"], []).append((fetch["outcome"], fetch["http_status"]))
+    return tries
+
+
+def test_transient_failures_are_retried_other_4xx_are_not_and_a_404_marks_the_page_missing(
+    crawl_settings: Settings, database: Engine
+):
+    flaky_answers = iter([503, 429])
+
+    def flaky() -> httpx.Response:
+        status = next(flaky_answers, 200)
+        return httpx.Response(status, content=b"%PDF-1.4" if status == 200 else b"")
+
+    def silent() -> httpx.Response:
+        raise httpx.ReadTimeout("no answer")
+
+    first = Website(
+        {f"{SITE}/": page("/flaky.pdf", "/silent", "/gone", "/forbidden")},
+        statuses={f"{SITE}/forbidden": 403},
+        responses={f"{SITE}/flaky.pdf": flaky, f"{SITE}/silent": silent},
+    )
+    run_id = create_run()
+
+    asyncio.run(crawl(crawl_settings, run_id, first))
+
+    (run,) = rows(database, "SELECT status, error FROM crawl_runs WHERE id = :id", id=run_id)
+    assert (run["status"], run["error"]) == ("finished", None)
+    assert attempts(database, run_id) == {
+        f"{SITE}/": [("fetched", 200)],
+        f"{SITE}/flaky.pdf": [("failed_http", 503), ("failed_http", 429), ("fetched", 200)],
+        f"{SITE}/silent": [("failed_timeout", None)] * 4,
+        f"{SITE}/gone": [("failed_http", 404)],
+        f"{SITE}/forbidden": [("failed_http", 403)],
+    }
+    missing = rows(database, "SELECT url FROM webpages WHERE missing_since IS NOT NULL")
+    assert missing == [{"url": f"{SITE}/gone"}]
+
+    # The next run finds the page back: it is no longer missing.
+    second = Website({f"{SITE}/": page("/gone"), f"{SITE}/gone": page()})
+    asyncio.run(crawl(crawl_settings, create_run(), second))
+
+    assert rows(database, "SELECT url FROM webpages WHERE missing_since IS NOT NULL") == []
+
+
+def test_a_full_run_whose_homepage_cannot_be_fetched_fails_with_the_error_shown(
+    crawl_settings: Settings, database: Engine
+):
+    run_id = create_run()
+    website = Website({f"{SITE}/other": page()}, statuses={f"{SITE}/": 503})
+
+    asyncio.run(crawl(crawl_settings, run_id, website))
+
+    assert attempts(database, run_id)[f"{SITE}/"] == [("failed_http", 503)] * 4
+    error = f"The homepage {SITE}/ could not be fetched: failed_http (HTTP 503)"
+    (run,) = rows(database, "SELECT status, error FROM crawl_runs")
+    assert (run["status"], run["error"]) == ("failed", error)
+    app = create_app(
+        crawl_settings, object_store=MemoryObjectStore(), jobs_connector=InMemoryConnector()
+    )
+    with TestClient(app) as client:
+        shown = client.get(f"/runs/{run_id}").json()
+    assert (shown["status"], shown["error"]) == ("failed", error)
