@@ -171,8 +171,6 @@ assert MAX_FILE_BYTES == 100 * 1024 * 1024
         ),
         ("https://createto.ca/download/8", "text/csv"),
         ("https://createto.ca/download/9", "Text/Plain; charset=windows-1252"),
-        ("https://createto.ca/download/10", "image/png"),
-        ("https://createto.ca/download/11", "image/svg+xml"),
         # The extension already said it is a supported file: the header is not asked.
         (REPORT, "application/octet-stream"),
     ],
@@ -187,6 +185,8 @@ def test_a_supported_response_is_kept(url: str, content_type: str):
         ("application/zip", "application/zip"),
         ("application/x-msdownload", "application/x-msdownload"),
         ("video/mp4", "video/mp4"),
+        ("image/png", "image/png"),
+        ("image/svg+xml", "image/svg+xml"),
         ("application/json; charset=utf-8", "application/json"),
         ("application/octet-stream", "application/octet-stream"),
     ],

@@ -87,7 +87,6 @@ def test_every_pdf_in_the_parkdale_hub_page_body_is_found():
     "url",
     [
         "https://a-us.storyblok.com/f/1017201/x/0a1b2c3d4e/report.pdf",
-        "https://a-us.storyblok.com/f/1017201/1200x627/d41395f46b/annual-report-3-4.png",
         "https://example.com/Minutes.DOCX",
         "https://example.com/data/table.csv?download=1",
     ],
@@ -106,6 +105,7 @@ def test_a_url_with_a_file_extension_looks_like_a_file(url: str):
         "https://example.com/v1.2/notes",
         "https://example.com/?file=report.pdf",
         "https://a-us.storyblok.com/f/1017201/x/b500f5503f/createto_web_v2_h264.mp4",
+        "https://a-us.storyblok.com/f/1017201/1200x627/d41395f46b/annual-report-3-4.png",
     ],
 )
 def test_a_url_without_a_file_extension_does_not(url: str):
@@ -120,6 +120,8 @@ def test_a_url_without_a_file_extension_does_not(url: str):
         ("https://createto.ca/data/parcels.tar.gz?v=2", "gz"),
         ("https://createto.ca/_next/static/app.js", "js"),
         ("https://createto.ca/video/tour.mp4", "mp4"),
+        ("https://a-us.storyblok.com/f/1017201/1200x627/d41395f46b/annual-report.PNG", "png"),
+        ("https://createto.ca/logo.svg", "svg"),
     ],
 )
 def test_a_url_with_an_unsupported_extension_names_it(url: str, extension: str):

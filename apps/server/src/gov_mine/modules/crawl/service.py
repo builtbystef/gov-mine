@@ -57,7 +57,7 @@ FINISH_POLL = timedelta(seconds=3)
 DEFAULT_MEDIA_TYPE = "application/octet-stream"
 HTML_MEDIA_TYPES = frozenset({"text/html", "application/xhtml+xml"})
 # What the crawler downloads when the URL's extension does not say: HTML, PDF, office files, csv
-# and plain text, and any image (`image/*`).
+# and plain text. Not images (`image/*`): nothing reads them until OCR exists.
 SUPPORTED_MEDIA_TYPES = HTML_MEDIA_TYPES | {
     "application/pdf",
     "application/msword",
@@ -322,16 +322,12 @@ def response_refusal(
     does (servers often call a PDF `application/octet-stream`), or a `Content-Length` over
     `max_bytes`."""
     media_type = media_type_of(response)
-    if not looks_like_file(url) and not _supported(media_type):
+    if not looks_like_file(url) and media_type not in SUPPORTED_MEDIA_TYPES:
         return FetchOutcome.SKIPPED_TYPE, f"content_type {media_type}"
     length = response.headers.get("content-length", "")
     if length.isdigit() and int(length) > max_bytes:
         return FetchOutcome.SKIPPED_SIZE, f"content_length {length} > {max_bytes}"
     return None
-
-
-def _supported(media_type: str) -> bool:
-    return media_type in SUPPORTED_MEDIA_TYPES or media_type.startswith("image/")
 
 
 async def read_body(response: httpx.Response, max_bytes: int) -> bytes | None:

@@ -1096,11 +1096,6 @@ SUPPORTED_TYPES = {
     "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     "csv": "text/csv",
     "txt": "text/plain",
-    "png": "image/png",
-    "jpg": "image/jpeg",
-    "gif": "image/gif",
-    "svg": "image/svg+xml",
-    "webp": "image/webp",
 }
 
 
@@ -1113,7 +1108,7 @@ def test_every_supported_type_is_fetched_with_one_get_and_unsupported_extensions
     # On a files_only host too, where only what looks like a file is fetched.
     on_storyblok = {f"{STORYBLOK}/sample.{ext}": media for ext, media in SUPPORTED_TYPES.items()}
     supported = by_extension | by_header | on_storyblok
-    unsupported = [f"{SITE}/files/archive.zip", f"{SITE}/files/setup.exe"]
+    unsupported = [f"{SITE}/files/archive.zip", f"{SITE}/files/setup.exe", f"{SITE}/files/map.png"]
     website = Website(
         {
             f"{SITE}/": page(*supported, *unsupported),
@@ -1136,6 +1131,7 @@ def test_every_supported_type_is_fetched_with_one_get_and_unsupported_extensions
         **dict.fromkeys(supported, ("fetched", None, True)),
         f"{SITE}/files/archive.zip": ("skipped_type", "extension zip", False),
         f"{SITE}/files/setup.exe": ("skipped_type", "extension exe", False),
+        f"{SITE}/files/map.png": ("skipped_type", "extension png", False),
     }
     snapshots = {
         row["url"]: row["media_type"]

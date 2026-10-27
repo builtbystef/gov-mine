@@ -13,25 +13,20 @@ TRACKING_PARAMETERS = frozenset(
     {"fbclid", "gclid", "dclid", "msclkid", "yclid", "igshid", "mc_cid", "mc_eid", "_ga", "_gl"}
 )
 
-# The extensions of the files the crawler downloads: PDF, office files, csv, txt and images.
+# The extensions of the files the crawler downloads: PDF, office files, csv and txt.
 # A URL ending in one looks like a file, which is all a `files_only` host may serve.
-FILE_EXTENSIONS = frozenset(
-    {
-        "pdf",
-        *("doc", "docx", "xls", "xlsx", "ppt", "pptx"),
-        *("csv", "txt"),
-        *("avif", "bmp", "gif", "jpeg", "jpg", "png", "svg", "tif", "tiff", "webp"),
-    }
-)
+FILE_EXTENSIONS = frozenset({"pdf", *("doc", "docx", "xls", "xlsx", "ppt", "pptx"), "csv", "txt"})
 # The extensions of what the crawler never downloads: archives, programs and disk images, video
-# and audio, a site's code, styles and fonts, and data it cannot parse. A URL ending in one is
-# refused before any request; one ending in neither list is judged by its response's headers.
+# and audio, images (nothing reads them until OCR exists), a site's code, styles and fonts, and
+# data it cannot parse. A URL ending in one is refused before any request; one ending in neither
+# list is judged by its response's headers.
 UNSUPPORTED_EXTENSIONS = frozenset(
     {
         *("zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz"),
         *("exe", "msi", "dmg", "pkg", "apk", "deb", "rpm", "jar", "bin", "iso", "img"),
         *("mp4", "m4v", "mov", "avi", "wmv", "mkv", "webm", "flv", "mpg", "mpeg"),
         *("mp3", "m4a", "wav", "aac", "ogg", "oga", "flac", "wma"),
+        *("avif", "bmp", "gif", "heic", "jpeg", "jpg", "png", "svg", "tif", "tiff", "webp"),
         *("js", "mjs", "css", "map", "woff", "woff2", "ttf", "otf", "eot", "ico"),
         *("json", "xml", "rss", "ics", "kml", "kmz", "shp", "dwg", "rtf", "odt", "ods", "odp"),
     }
