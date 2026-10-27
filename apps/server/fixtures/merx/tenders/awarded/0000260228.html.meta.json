@@ -1,0 +1,25 @@
+{
+  "url": "https://www.merx.com/buildtorontotplc/solicitations/Architecture-Services-for-Indigenous-Long-Term-Care-Home/0000260228?origin=0",
+  "final_url": "https://www.merx.com/buildtorontotplc/solicitations/Architecture-Services-for-Indigenous-Long-Term-Care-Home/0000260228?origin=0",
+  "status": 200,
+  "error": null,
+  "fetched_at": "2026-10-27T10:11:17+00:00",
+  "user_agent": "gov-mine-fixtures/0.1",
+  "request_headers": {},
+  "headers": {
+    "Date": "Tue, 27 Oct 2026 10:11:17 GMT",
+    "Content-Type": "text/html;charset=utf-8",
+    "Transfer-Encoding": "chunked",
+    "Connection": "close",
+    "Set-Cookie": "AWSALB=Tt2qrCtTin0tWdvEvenhQ3NEEPTaxTRm7wrMXf9zvFIDdVo23KtB5VNNhb6hnvzTUlpKfkaD/UOSv7ymSEAtdUTRi6OKuOqMCKZBe0RqCogDo4Qi1xhbdV6NC/tI; Expires=Tue, 03 Nov 2026 10:11:17 GMT; Path=/",
+    "X-OneAgent-JS-Injection": "true",
+    "Server-Timing": "dtTrId;desc=\"2fd1111bad8d7b9eba7701364178bfad\", dtRpid;desc=\"-1477082662\", dtSInfo;desc=\"0\"",
+    "Strict-Transport-Security": "max-age=31536000;includeSubDomains;preload",
+    "Pragma": "no-cache",
+    "Cache-Control": "no-cache",
+    "Expires": "Thu, 01 Jan 1970 00:00:00 GMT",
+    "X-Frame-Options": "SAMEORIGIN",
+    "Content-Language": "en"
+  },
+  "bytes": 71448
+}

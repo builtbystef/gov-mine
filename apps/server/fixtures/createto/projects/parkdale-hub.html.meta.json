@@ -1,0 +1,25 @@
+{
+  "url": "https://createto.ca/projects/parkdale-hub",
+  "final_url": "https://createto.ca/projects/parkdale-hub",
+  "status": 200,
+  "error": null,
+  "fetched_at": "2026-10-27T10:05:09+00:00",
+  "user_agent": "gov-mine-fixtures/0.1",
+  "headers": {
+    "Age": "980",
+    "Cache-Control": "public, max-age=0, must-revalidate",
+    "Content-Encoding": "gzip",
+    "Content-Type": "text/html; charset=utf-8",
+    "Date": "Mon, 26 Oct 2026 21:05:24 GMT",
+    "Etag": "W/\"e32mwkyhkj680f\"",
+    "Server": "Vercel",
+    "Strict-Transport-Security": "max-age=63072000",
+    "X-Matched-Path": "/projects/parkdale-hub",
+    "X-Powered-By": "Next.js",
+    "X-Vercel-Cache": "STALE",
+    "X-Vercel-Id": "yul1::iad1::gnwzk-1793095508939-56f81562bb88",
+    "Connection": "close",
+    "Transfer-Encoding": "chunked"
+  },
+  "bytes": 290576
+}

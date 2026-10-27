@@ -1,0 +1,29 @@
+{
+  "url": "https://a-us.storyblok.com/f/1017201/x/0a2dd7f9f0/meeting-2021-information-sheet-phase-2.pdf",
+  "final_url": "https://a-us.storyblok.com/f/1017201/x/0a2dd7f9f0/meeting-2021-information-sheet-phase-2.pdf",
+  "status": 200,
+  "error": null,
+  "fetched_at": "2026-10-27T10:05:20+00:00",
+  "user_agent": "gov-mine-fixtures/0.1",
+  "headers": {
+    "Content-Type": "application/pdf",
+    "Transfer-Encoding": "chunked",
+    "Connection": "close",
+    "Content-Encoding": "gzip",
+    "Date": "Tue, 27 Oct 2026 02:29:55 GMT",
+    "Server": "AmazonS3",
+    "Last-Modified": "Tue, 07 Nov 2023 22:03:25 GMT",
+    "x-amz-server-side-encryption": "AES256",
+    "x-amz-version-id": "Ii_IiInRNOYKGdUZM97ZNJCHML1jE.8Q",
+    "Cache-Control": "public; max-age=31536000",
+    "Expires": "Wed, 06 Nov 2024 22:03:23 GMT",
+    "ETag": "W/\"e3a4acb91203e79a7eaca3591656bddb\"",
+    "Vary": "Accept-Encoding",
+    "X-Cache": "Hit from cloudfront",
+    "Via": "1.1 6477e7b623b71ec66bc28ed8e271db7e.cloudfront.net (CloudFront)",
+    "X-Amz-Cf-Pop": "YTO50-P1",
+    "X-Amz-Cf-Id": "LPJVjP24-HmRkg-9hqNfEjysMaWogh83fb74-sTwQ1Rmkkjl4-j6Tg==",
+    "Age": "27325"
+  },
+  "bytes": 335366
+}

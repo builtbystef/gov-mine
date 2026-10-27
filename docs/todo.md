@@ -15,9 +15,9 @@
 
 ## 2. Capture fixtures
 
-- [ ] Save the CreateTO pages the spec relies on to `apps/server/fixtures/createto/`: the
+- [x] Save the CreateTO pages the spec relies on to `apps/server/fixtures/createto/`: the
       homepage, a project page with its `__NEXT_DATA__`, the Parkdale Hub page and its PDFs.
-- [ ] Save the MERX search tabs, tender pages and award panels to `apps/server/fixtures/merx/`.
+- [x] Save the MERX search tabs, tender pages and award panels to `apps/server/fixtures/merx/`.
 
 ## 3. Break the spec into tickets
 

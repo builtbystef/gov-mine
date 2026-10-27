@@ -1,0 +1,25 @@
+{
+  "url": "https://www.merx.com/buildtorontotplc/solicitations/Jack-Layton-Ferry-Terminal-Shoreside-Infrastructure-Works/0000283274?origin=0",
+  "final_url": "https://www.merx.com/buildtorontotplc/solicitations/Jack-Layton-Ferry-Terminal-Shoreside-Infrastructure-Works/0000283274?origin=0",
+  "status": 200,
+  "error": null,
+  "fetched_at": "2026-10-27T10:11:50+00:00",
+  "user_agent": "gov-mine-fixtures/0.1",
+  "request_headers": {},
+  "headers": {
+    "Date": "Tue, 27 Oct 2026 10:11:50 GMT",
+    "Content-Type": "text/html;charset=utf-8",
+    "Transfer-Encoding": "chunked",
+    "Connection": "close",
+    "Set-Cookie": "AWSALB=LqeYMaNZ1hwa95XZdBWo/v6dWebdSpZD//K/ohPqgJ9zHasla6qERA4FNGWhiFTqhmGEXmRp+INBGuVh7DXDjqsh8lYaQLL2jInspDXKIsC+6/+jjzTx8zb3WRet; Expires=Tue, 03 Nov 2026 10:11:49 GMT; Path=/",
+    "X-OneAgent-JS-Injection": "true",
+    "Server-Timing": "dtTrId;desc=\"c1d20b51b0f5b355a166dd1a2252f1b4\", dtRpid;desc=\"359610427\", dtSInfo;desc=\"0\"",
+    "Strict-Transport-Security": "max-age=31536000;includeSubDomains;preload",
+    "Pragma": "no-cache",
+    "Cache-Control": "no-cache",
+    "Expires": "Thu, 01 Jan 1970 00:00:00 GMT",
+    "X-Frame-Options": "SAMEORIGIN",
+    "Content-Language": "en"
+  },
+  "bytes": 76075
+}

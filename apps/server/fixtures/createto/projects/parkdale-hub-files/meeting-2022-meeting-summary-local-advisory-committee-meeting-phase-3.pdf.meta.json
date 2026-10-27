@@ -1,0 +1,29 @@
+{
+  "url": "https://a-us.storyblok.com/f/1017201/x/7d2b7b1660/meeting-2022-meeting-summary-local-advisory-committee-meeting-phase-3.pdf",
+  "final_url": "https://a-us.storyblok.com/f/1017201/x/7d2b7b1660/meeting-2022-meeting-summary-local-advisory-committee-meeting-phase-3.pdf",
+  "status": 200,
+  "error": null,
+  "fetched_at": "2026-10-27T10:05:24+00:00",
+  "user_agent": "gov-mine-fixtures/0.1",
+  "headers": {
+    "Content-Type": "application/pdf",
+    "Transfer-Encoding": "chunked",
+    "Connection": "close",
+    "Content-Encoding": "gzip",
+    "Date": "Tue, 27 Oct 2026 02:29:40 GMT",
+    "Server": "AmazonS3",
+    "Last-Modified": "Tue, 07 Nov 2023 22:03:25 GMT",
+    "x-amz-server-side-encryption": "AES256",
+    "x-amz-version-id": "qc39Ti_NreHaFzwaIzHgNhuec89PDe8h",
+    "Cache-Control": "public; max-age=31536000",
+    "Expires": "Wed, 06 Nov 2024 22:03:24 GMT",
+    "ETag": "W/\"ea4431d013f89d4defa6407c72ddd0ce\"",
+    "Vary": "Accept-Encoding",
+    "X-Cache": "Hit from cloudfront",
+    "Via": "1.1 3758a948ce5cf1a44c10afecd9aed040.cloudfront.net (CloudFront)",
+    "X-Amz-Cf-Pop": "YTO50-P1",
+    "X-Amz-Cf-Id": "b__nquNV3eaGHZYPE4RlJ2zrfaULyrRaR4vrtB1nV2jdgL-kOyeE7w==",
+    "Age": "27344"
+  },
+  "bytes": 199602
+}

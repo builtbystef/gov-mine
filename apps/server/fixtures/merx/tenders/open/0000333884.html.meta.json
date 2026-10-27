@@ -1,0 +1,24 @@
+{
+  "url": "https://www.merx.com/solicitations/open-bids/Testing-Inspection-Services-at-1113-1125-Dundas-St-W/0000333884?origin=0",
+  "final_url": "https://www.merx.com/solicitations/open-bids/Testing-Inspection-Services-at-1113-1125-Dundas-St-W/0000333884?origin=0",
+  "status": 200,
+  "error": null,
+  "fetched_at": "2026-10-27T10:08:18+00:00",
+  "user_agent": "gov-mine-fixtures/0.1",
+  "headers": {
+    "Date": "Tue, 27 Oct 2026 10:08:18 GMT",
+    "Content-Type": "text/html;charset=utf-8",
+    "Transfer-Encoding": "chunked",
+    "Connection": "close",
+    "Set-Cookie": "AWSALB=whsOOpCDR4phr4xq+TpQKX6mDGae3glxNoBZyYjmP2ak28nF9c5OouGG2tvHyiObYi5qVaWbkK32MLWNRekiRp+7jRVAokuF9b+KO+nkWafYIvP4pnVl96dTDYpR; Expires=Tue, 03 Nov 2026 10:08:18 GMT; Path=/",
+    "X-OneAgent-JS-Injection": "true",
+    "Server-Timing": "dtTrId;desc=\"6381c77479fa406227af237710df4331\", dtRpid;desc=\"-67720341\", dtSInfo;desc=\"0\"",
+    "Strict-Transport-Security": "max-age=31536000;includeSubDomains;preload",
+    "Pragma": "no-cache",
+    "Cache-Control": "no-cache",
+    "Expires": "Thu, 01 Jan 1970 00:00:00 GMT",
+    "X-Frame-Options": "SAMEORIGIN",
+    "Content-Language": "en"
+  },
+  "bytes": 73046
+}

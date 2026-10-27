@@ -1,0 +1,25 @@
+{
+  "url": "https://createto.ca/projects/dunn-house-phase-2",
+  "final_url": "https://createto.ca/springhouse",
+  "status": 200,
+  "error": null,
+  "fetched_at": "2026-10-27T10:05:07+00:00",
+  "user_agent": "gov-mine-fixtures/0.1",
+  "headers": {
+    "Age": "12300",
+    "Cache-Control": "public, max-age=0, must-revalidate",
+    "Content-Encoding": "gzip",
+    "Content-Type": "text/html; charset=utf-8",
+    "Date": "Mon, 26 Oct 2026 21:01:18 GMT",
+    "Etag": "W/\"dbp6kgzb5u5jb4\"",
+    "Server": "Vercel",
+    "Strict-Transport-Security": "max-age=63072000",
+    "X-Matched-Path": "/projects/dunn-house-phase-2",
+    "X-Powered-By": "Next.js",
+    "X-Vercel-Cache": "STALE",
+    "X-Vercel-Id": "yul1::iad1::psmgc-1793095507387-d66ee5bb3475",
+    "Connection": "close",
+    "Transfer-Encoding": "chunked"
+  },
+  "bytes": 258477
+}

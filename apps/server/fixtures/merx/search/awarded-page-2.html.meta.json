@@ -1,0 +1,24 @@
+{
+  "url": "https://www.merx.com/public/solicitations/awarded?keywords=createto&pageNumber=2",
+  "final_url": "https://www.merx.com/public/solicitations/awarded?keywords=createto&pageNumber=2",
+  "status": 200,
+  "error": null,
+  "fetched_at": "2026-10-27T10:08:02+00:00",
+  "user_agent": "gov-mine-fixtures/0.1",
+  "headers": {
+    "Date": "Tue, 27 Oct 2026 10:08:02 GMT",
+    "Content-Type": "text/html;charset=utf-8",
+    "Transfer-Encoding": "chunked",
+    "Connection": "close",
+    "Set-Cookie": "AWSALB=7dsGQj1+Bi6MBdy0rRz8HjKt7g8v0Qzo5TvJsiZrCvm8K7KoM65ZbO+35DtJp8O1bPZJ1yZeqmo9DUZhUiT+tR93Zj7dXSNcif5ivYbhJ74EhqdBZXdr3jsI02rU; Expires=Tue, 03 Nov 2026 10:08:02 GMT; Path=/",
+    "X-OneAgent-JS-Injection": "true",
+    "Server-Timing": "dtTrId;desc=\"4914b24e649126979d85d512dd510c70\", dtRpid;desc=\"1774441872\", dtSInfo;desc=\"0\"",
+    "Strict-Transport-Security": "max-age=31536000;includeSubDomains;preload",
+    "Pragma": "no-cache",
+    "Cache-Control": "no-cache",
+    "Expires": "Thu, 01 Jan 1970 00:00:00 GMT",
+    "X-Frame-Options": "SAMEORIGIN",
+    "Content-Language": "en"
+  },
+  "bytes": 180832
+}

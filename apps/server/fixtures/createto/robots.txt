@@ -1,0 +1,9 @@
+# *
+User-agent: *
+Allow: /
+
+# Host
+Host: https://createto.ca
+
+# Sitemaps
+Sitemap: https://createto.ca/sitemap.xml

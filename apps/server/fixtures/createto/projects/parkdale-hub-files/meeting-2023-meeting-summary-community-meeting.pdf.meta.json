@@ -1,0 +1,29 @@
+{
+  "url": "https://a-us.storyblok.com/f/1017201/x/9e64fcd485/meeting-2023-meeting-summary-community-meeting.pdf",
+  "final_url": "https://a-us.storyblok.com/f/1017201/x/9e64fcd485/meeting-2023-meeting-summary-community-meeting.pdf",
+  "status": 200,
+  "error": null,
+  "fetched_at": "2026-10-27T10:05:26+00:00",
+  "user_agent": "gov-mine-fixtures/0.1",
+  "headers": {
+    "Content-Type": "application/pdf",
+    "Transfer-Encoding": "chunked",
+    "Connection": "close",
+    "Server": "AmazonS3",
+    "Date": "Tue, 27 Oct 2026 02:29:36 GMT",
+    "Last-Modified": "Tue, 07 Nov 2023 22:03:25 GMT",
+    "Content-Encoding": "gzip",
+    "x-amz-server-side-encryption": "AES256",
+    "Cache-Control": "public; max-age=31536000",
+    "Expires": "Wed, 06 Nov 2024 22:03:24 GMT",
+    "x-amz-version-id": "88dTH36HP2LhWhMDEwhRbtSIkUJkwhSq",
+    "ETag": "W/\"62f93a0be7abd56043718c80970950e1\"",
+    "Vary": "Accept-Encoding",
+    "X-Cache": "Hit from cloudfront",
+    "Via": "1.1 1469d4976bc2a36b5840519c9e3dbad6.cloudfront.net (CloudFront)",
+    "X-Amz-Cf-Pop": "YTO50-P1",
+    "X-Amz-Cf-Id": "1-Ts8t7a5sCF6FnsTIc6aWhg2JqdeUDzdQ6ZWJQmr1wkWAlet6jJrw==",
+    "Age": "27351"
+  },
+  "bytes": 242620
+}

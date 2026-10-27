@@ -1,0 +1,29 @@
+{
+  "url": "https://a-us.storyblok.com/f/1017201/x/aba088a86e/final-parkdalemarketsounding-deck.pdf",
+  "final_url": "https://a-us.storyblok.com/f/1017201/x/aba088a86e/final-parkdalemarketsounding-deck.pdf",
+  "status": 200,
+  "error": null,
+  "fetched_at": "2026-10-27T10:05:15+00:00",
+  "user_agent": "gov-mine-fixtures/0.1",
+  "headers": {
+    "Content-Type": "application/pdf",
+    "Transfer-Encoding": "chunked",
+    "Connection": "close",
+    "Server": "AmazonS3",
+    "Date": "Tue, 27 Oct 2026 02:29:33 GMT",
+    "Last-Modified": "Fri, 01 Dec 2023 19:51:21 GMT",
+    "Content-Encoding": "gzip",
+    "x-amz-server-side-encryption": "AES256",
+    "Cache-Control": "public; max-age=31536000",
+    "Expires": "Sat, 30 Nov 2024 19:51:19 GMT",
+    "x-amz-version-id": "Hd.l9Nf_yGR4IjRIbQmLD0N3A5RFoWje",
+    "ETag": "W/\"5defab59761d7bf44105c697adbfe67e\"",
+    "Vary": "Accept-Encoding",
+    "X-Cache": "Hit from cloudfront",
+    "Via": "1.1 614ee5305862f7e9bae65335466e5512.cloudfront.net (CloudFront)",
+    "X-Amz-Cf-Pop": "YTO50-P1",
+    "X-Amz-Cf-Id": "l92F5lnH4MPbBK9JfrENclvhxFD5QjSc-hphHOTtXrdrHOIttnMczA==",
+    "Age": "27343"
+  },
+  "bytes": 2064942
+}

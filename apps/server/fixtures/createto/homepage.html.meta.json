@@ -1,0 +1,25 @@
+{
+  "url": "https://createto.ca/",
+  "final_url": "https://createto.ca/",
+  "status": 200,
+  "error": null,
+  "fetched_at": "2026-10-27T10:05:04+00:00",
+  "user_agent": "gov-mine-fixtures/0.1",
+  "headers": {
+    "Age": "15",
+    "Cache-Control": "public, max-age=0, must-revalidate",
+    "Content-Encoding": "gzip",
+    "Content-Type": "text/html; charset=utf-8",
+    "Date": "Mon, 26 Oct 2026 20:49:25 GMT",
+    "Etag": "W/\"2cqeceo3tz22r7\"",
+    "Server": "Vercel",
+    "Strict-Transport-Security": "max-age=63072000",
+    "X-Matched-Path": "/",
+    "X-Powered-By": "Next.js",
+    "X-Vercel-Cache": "HIT",
+    "X-Vercel-Id": "yul1::iad1::q7ggk-1793095504045-426139897ccd",
+    "Connection": "close",
+    "Transfer-Encoding": "chunked"
+  },
+  "bytes": 96920
+}

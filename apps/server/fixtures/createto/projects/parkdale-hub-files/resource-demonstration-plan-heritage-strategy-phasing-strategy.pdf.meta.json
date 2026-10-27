@@ -1,0 +1,29 @@
+{
+  "url": "https://a-us.storyblok.com/f/1017201/x/6eccd855af/resource-demonstration-plan-heritage-strategy-phasing-strategy.pdf",
+  "final_url": "https://a-us.storyblok.com/f/1017201/x/6eccd855af/resource-demonstration-plan-heritage-strategy-phasing-strategy.pdf",
+  "status": 200,
+  "error": null,
+  "fetched_at": "2026-10-27T10:05:17+00:00",
+  "user_agent": "gov-mine-fixtures/0.1",
+  "headers": {
+    "Content-Type": "application/pdf",
+    "Transfer-Encoding": "chunked",
+    "Connection": "close",
+    "Server": "AmazonS3",
+    "Date": "Tue, 27 Oct 2026 02:29:45 GMT",
+    "Last-Modified": "Tue, 07 Nov 2023 22:03:30 GMT",
+    "Content-Encoding": "gzip",
+    "x-amz-server-side-encryption": "AES256",
+    "Cache-Control": "public; max-age=31536000",
+    "Expires": "Wed, 06 Nov 2024 22:03:29 GMT",
+    "x-amz-version-id": "qHCE0CBvQRAWBT8k9ptKhMWEHyD_gNrl",
+    "ETag": "W/\"22db79539ee282a0e3d3e3a595a43a1a\"",
+    "Vary": "Accept-Encoding",
+    "X-Cache": "Hit from cloudfront",
+    "Via": "1.1 614ee5305862f7e9bae65335466e5512.cloudfront.net (CloudFront)",
+    "X-Amz-Cf-Pop": "YTO50-P1",
+    "X-Amz-Cf-Id": "FnC04Ktr7zkOwPvPSWIIUWLCOakhEsO6XMS9oVR-LFSNskscnvhP-g==",
+    "Age": "27333"
+  },
+  "bytes": 3355747
+}

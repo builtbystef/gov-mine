@@ -3,10 +3,16 @@ import { defineConfig } from "vite-plus";
 export default defineConfig({
   staged: {
     "*": "vp check --fix",
-    "*.py": ["uv run ruff check --fix", "uv run ruff format", "uv run ty check"],
+    "*.py": ["uv run ruff check --fix", "uv run ruff format", "uv run ty check --force-exclude"],
   },
   fmt: {
-    ignorePatterns: ["**/.next/**", "**/src/generated/**", "packages/api-client/openapi.json"],
+    ignorePatterns: [
+      "**/.next/**",
+      "**/src/generated/**",
+      "packages/api-client/openapi.json",
+      // Saved third-party pages, kept byte-exact for tests and replay.
+      "apps/server/fixtures/**",
+    ],
   },
   lint: {
     options: {
@@ -25,7 +31,13 @@ export default defineConfig({
       "max-lines": ["error", { max: 500, skipBlankLines: true, skipComments: true }],
       "max-lines-per-function": ["error", { max: 150, skipBlankLines: true, skipComments: true }],
     },
-    ignorePatterns: ["**/dist/**", "**/.next/**", "**/coverage/**", "**/src/generated/**"],
+    ignorePatterns: [
+      "**/dist/**",
+      "**/.next/**",
+      "**/coverage/**",
+      "**/src/generated/**",
+      "apps/server/fixtures/**",
+    ],
     overrides: [
       {
         files: ["**/*.test.ts", "**/*.spec.ts"],

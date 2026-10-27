@@ -1,0 +1,101 @@
+# ==========================================================
+# METS Procurement Platform - robots.txt
+# Portal: MERX (Canadian Government Procurement)
+# Deploy to: cms-portals/MERX/cms/public/robots/robots.txt
+#            (and an identical copy at robots.https.txt)
+# ==========================================================
+
+# Default policy: all well-behaved crawlers
+User-agent: *
+
+# --- Authenticated areas (blocked) ---
+Disallow: /private/
+Disallow: /favorites
+
+# --- Public pages that are NOT indexable ---
+# Registration, authentication, and service flows are transactional,
+# not content - crawling them wastes budget and can trigger side effects.
+Disallow: /public/registration/
+Disallow: /public/authentication/
+Disallow: /public/info
+Disallow: /public/supplier/services/
+Disallow: /public/monitoring
+Disallow: /public/sendgrid/
+Disallow: /public/dev-tools/
+
+# --- Developer / internal tooling (blocked) ---
+Disallow: /dev-tools/
+
+# --- SOAP web services (blocked) ---
+Disallow: /ws/
+
+# --- Bundled static assets (blocked from crawl, not from rendering) ---
+# JAWR-bundled resources have cache-busting hashes; crawling them wastes budget.
+Disallow: /jawr/
+
+# --- Login / session management ---
+Disallow: /login
+Disallow: /logout
+Disallow: /saml/
+
+# --- Query-string traps ---
+# Prevent crawlers from following search facet permutations that
+# produce near-duplicate pages (common in procurement search UIs).
+Disallow: /*?*sort=
+Disallow: /*?*page=
+Disallow: /*?*pageSize=
+Disallow: /*?*jsessionid=
+
+# --- Crawl rate ---
+# Procurement sites can have expensive search pages; throttle politely.
+# (Respected by Bing; Googlebot uses Search Console instead.)
+Crawl-delay: 5
+
+# --- Sitemap ---
+Sitemap: https://www.merx.com/sitemap.xml
+
+# ==========================================================
+# Aggressive crawlers / AI scrapers - block entirely
+# ==========================================================
+
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: OAI-SearchBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Claude-Web
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: PerplexityBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /

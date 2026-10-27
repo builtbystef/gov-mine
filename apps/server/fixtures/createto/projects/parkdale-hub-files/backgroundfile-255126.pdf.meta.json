@@ -1,0 +1,28 @@
+{
+  "url": "https://www.toronto.ca/legdocs/mmis/2025/ph/bgrd/backgroundfile-255126.pdf",
+  "final_url": "https://www.toronto.ca/legdocs/mmis/2025/ph/bgrd/backgroundfile-255126.pdf",
+  "status": 200,
+  "error": null,
+  "fetched_at": "2026-10-27T10:05:09+00:00",
+  "user_agent": "gov-mine-fixtures/0.1",
+  "headers": {
+    "Content-Type": "application/pdf",
+    "Transfer-Encoding": "chunked",
+    "Connection": "close",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "Last-Modified": "Fri, 02 May 2025 14:25:48 GMT",
+    "Content-Encoding": "gzip",
+    "Date": "Tue, 27 Oct 2026 10:05:09 GMT",
+    "ETag": "W/\"7c462-63427ed34de50\"",
+    "Vary": "Accept-Encoding",
+    "X-Cache": "RefreshHit from cloudfront",
+    "Via": "1.1 e28f812a5672adfe3f02c5f108acee8c.cloudfront.net (CloudFront)",
+    "X-Amz-Cf-Pop": "YTO53-P2",
+    "Alt-Svc": "h3=\":443\"; ma=86400",
+    "X-Amz-Cf-Id": "Cb6mcPnbYIJ-jNkqzlLXwKWqIQ18JPBvaSFrgeOHGQmict3XVXSMcQ==",
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy-Report-Only": "default-src 'self' https: data: blob:; script-src 'self' https: 'unsafe-inline' 'unsafe-eval'; style-src 'self' https: 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https: wss:; frame-src 'self' https:; worker-src 'self' https: blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; upgrade-insecure-requests;",
+    "X-Permitted-Cross-Domain-Policies": "none"
+  },
+  "bytes": 509026
+}

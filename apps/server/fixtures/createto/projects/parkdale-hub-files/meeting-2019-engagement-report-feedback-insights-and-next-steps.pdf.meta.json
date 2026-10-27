@@ -1,0 +1,29 @@
+{
+  "url": "https://a-us.storyblok.com/f/1017201/x/13fa501faa/meeting-2019-engagement-report-feedback-insights-and-next-steps.pdf",
+  "final_url": "https://a-us.storyblok.com/f/1017201/x/13fa501faa/meeting-2019-engagement-report-feedback-insights-and-next-steps.pdf",
+  "status": 200,
+  "error": null,
+  "fetched_at": "2026-10-27T10:05:12+00:00",
+  "user_agent": "gov-mine-fixtures/0.1",
+  "headers": {
+    "Content-Type": "application/pdf",
+    "Transfer-Encoding": "chunked",
+    "Connection": "close",
+    "Server": "AmazonS3",
+    "Date": "Tue, 27 Oct 2026 02:29:54 GMT",
+    "Last-Modified": "Tue, 07 Nov 2023 22:03:25 GMT",
+    "Content-Encoding": "gzip",
+    "x-amz-server-side-encryption": "AES256",
+    "Cache-Control": "public; max-age=31536000",
+    "Expires": "Wed, 06 Nov 2024 22:03:23 GMT",
+    "x-amz-version-id": "yRFaPkqOHUUDyIc46FHMdSNkg.kvcdsK",
+    "ETag": "W/\"ba3b63bebdf15a645dbe7e129b98513b\"",
+    "Vary": "Accept-Encoding",
+    "X-Cache": "Hit from cloudfront",
+    "Via": "1.1 c73f9dc228a4b3fb05ae37ce52d04a1c.cloudfront.net (CloudFront)",
+    "X-Amz-Cf-Pop": "YTO50-P1",
+    "X-Amz-Cf-Id": "E4w0IlI5FlpogkATdedX3YIHv0nucD7D9NNt6O1_6VMCA2wgKMjwZA==",
+    "Age": "27319"
+  },
+  "bytes": 436408
+}

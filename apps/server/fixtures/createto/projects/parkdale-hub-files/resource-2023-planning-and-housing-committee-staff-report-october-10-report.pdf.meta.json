@@ -1,0 +1,29 @@
+{
+  "url": "https://a-us.storyblok.com/f/1017201/x/c514d0be9e/resource-2023-planning-and-housing-committee-staff-report-october-10-report.pdf",
+  "final_url": "https://a-us.storyblok.com/f/1017201/x/c514d0be9e/resource-2023-planning-and-housing-committee-staff-report-october-10-report.pdf",
+  "status": 200,
+  "error": null,
+  "fetched_at": "2026-10-27T10:05:09+00:00",
+  "user_agent": "gov-mine-fixtures/0.1",
+  "headers": {
+    "Content-Type": "application/pdf",
+    "Transfer-Encoding": "chunked",
+    "Connection": "close",
+    "Content-Encoding": "gzip",
+    "Date": "Tue, 27 Oct 2026 02:29:25 GMT",
+    "Server": "AmazonS3",
+    "Last-Modified": "Tue, 07 Nov 2023 22:03:30 GMT",
+    "x-amz-server-side-encryption": "AES256",
+    "x-amz-version-id": "3i7J1fjGvvRvWGyzCWbOGtz7rzZLDbvo",
+    "Cache-Control": "public; max-age=31536000",
+    "Expires": "Wed, 06 Nov 2024 22:03:29 GMT",
+    "ETag": "W/\"47a8789157ed926b87d5a1054161f0cf\"",
+    "Vary": "Accept-Encoding",
+    "X-Cache": "Hit from cloudfront",
+    "Via": "1.1 490c6f54e6cd81b80f07ff6be833267e.cloudfront.net (CloudFront)",
+    "X-Amz-Cf-Pop": "YTO50-P1",
+    "X-Amz-Cf-Id": "K7EZgnKkTWRyh1CsTh1ON9nkHKeuYrzYrO0UVzkQjCPI2FOj66Gvbw==",
+    "Age": "27344"
+  },
+  "bytes": 3441098
+}

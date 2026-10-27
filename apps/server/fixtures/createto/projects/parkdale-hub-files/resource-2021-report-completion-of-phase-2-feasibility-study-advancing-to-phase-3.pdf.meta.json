@@ -1,0 +1,29 @@
+{
+  "url": "https://a-us.storyblok.com/f/1017201/x/505dcf904a/resource-2021-report-completion-of-phase-2-feasibility-study-advancing-to-phase-3.pdf",
+  "final_url": "https://a-us.storyblok.com/f/1017201/x/505dcf904a/resource-2021-report-completion-of-phase-2-feasibility-study-advancing-to-phase-3.pdf",
+  "status": 200,
+  "error": null,
+  "fetched_at": "2026-10-27T10:05:18+00:00",
+  "user_agent": "gov-mine-fixtures/0.1",
+  "headers": {
+    "Content-Type": "application/pdf",
+    "Transfer-Encoding": "chunked",
+    "Connection": "close",
+    "Server": "AmazonS3",
+    "Date": "Tue, 27 Oct 2026 02:29:48 GMT",
+    "Last-Modified": "Tue, 07 Nov 2023 22:03:30 GMT",
+    "Content-Encoding": "gzip",
+    "x-amz-server-side-encryption": "AES256",
+    "Cache-Control": "public; max-age=31536000",
+    "Expires": "Wed, 06 Nov 2024 22:03:29 GMT",
+    "x-amz-version-id": "B4hpU3et_9c5Q2EK_XxXduYEw7gI7Pxg",
+    "ETag": "W/\"41243f18ac04dc319aa82075fa375638\"",
+    "Vary": "Accept-Encoding",
+    "X-Cache": "Hit from cloudfront",
+    "Via": "1.1 f0b5ff1c80ac588b3de0f130e6e2c0b6.cloudfront.net (CloudFront)",
+    "X-Amz-Cf-Pop": "YTO50-P1",
+    "X-Amz-Cf-Id": "GMxEMEMnUolckyx3HYjRHCap1JIC11PhbvRcEXk9SG3gvJJq9UzIKg==",
+    "Age": "27331"
+  },
+  "bytes": 602263
+}

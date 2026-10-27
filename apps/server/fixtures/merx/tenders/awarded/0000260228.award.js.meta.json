@@ -1,0 +1,28 @@
+{
+  "url": "https://www.merx.com/public/solicitations/2698769486/abstract/award",
+  "final_url": "https://www.merx.com/public/solicitations/2698769486/abstract/award",
+  "status": 200,
+  "error": null,
+  "fetched_at": "2026-10-27T10:11:22+00:00",
+  "user_agent": "gov-mine-fixtures/0.1",
+  "request_headers": {
+    "X-Requested-With": "XMLHttpRequest",
+    "Accept": "*/*"
+  },
+  "headers": {
+    "Date": "Tue, 27 Oct 2026 10:11:22 GMT",
+    "Content-Type": "text/javascript;charset=UTF-8",
+    "Transfer-Encoding": "chunked",
+    "Connection": "close",
+    "Set-Cookie": "AWSALB=AZgBswEOEA2ZH6ALCRQCMF5Ci/O8pT4rE7+iWn441ePbwfNkFbpfmk9XQFtUJp8LZ/k+jn7W9cgsSekUr8ymtobrU3QhSrbE6rrJsSljyptxryeB9F+fIv7A2XXs; Expires=Tue, 03 Nov 2026 10:11:22 GMT; Path=/",
+    "X-OneAgent-JS-Injection": "true",
+    "Server-Timing": "dtTrId;desc=\"d5416073902b53817b496651eb7793b2\", dtRpid;desc=\"-1065275115\", dtSInfo;desc=\"0\"",
+    "Strict-Transport-Security": "max-age=31536000;includeSubDomains;preload",
+    "Pragma": "no-cache",
+    "Cache-Control": "no-cache",
+    "Expires": "Thu, 01 Jan 1970 00:00:00 GMT",
+    "X-Frame-Options": "SAMEORIGIN",
+    "Content-Language": "en"
+  },
+  "bytes": 3812
+}

@@ -24,6 +24,10 @@ members = ["apps/server"]
 line-length = 100
 # Lets isort classify imports of workspace members as first-party.
 src = [".", "apps/*/src", "packages/*/src", "tools/*/src"]
+# Saved third-party pages and the script that captured them, kept byte-exact.
+extend-exclude = ["apps/server/fixtures"]
+# Honour the exclude when the pre-commit hook passes staged paths directly.
+force-exclude = true
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -80,3 +84,7 @@ filterwarnings = [
   # Starlette's TestClient bug; drop once it stops using anyio.abc.BlockingPortal.
   "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning",
 ]
+
+[tool.ty.src]
+# Saved third-party pages and the script that captured them.
+exclude = ["apps/server/fixtures"]

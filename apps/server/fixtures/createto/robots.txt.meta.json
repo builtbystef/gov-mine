@@ -1,0 +1,27 @@
+{
+  "url": "https://createto.ca/robots.txt",
+  "final_url": "https://createto.ca/robots.txt",
+  "status": 200,
+  "error": null,
+  "fetched_at": "2026-10-27T10:04:59+00:00",
+  "user_agent": "gov-mine-fixtures/0.1",
+  "headers": {
+    "Accept-Ranges": "bytes",
+    "Access-Control-Allow-Origin": "*",
+    "Age": "19075",
+    "Cache-Control": "public, max-age=0, must-revalidate",
+    "Content-Disposition": "inline; filename=\"robots.txt\"",
+    "Content-Length": "114",
+    "Content-Type": "text/plain; charset=utf-8",
+    "Date": "Tue, 27 Oct 2026 10:04:59 GMT",
+    "Etag": "\"9407dc0c313683955bc00044968ac50c\"",
+    "Last-Modified": "Tue, 27 Oct 2026 04:47:03 GMT",
+    "Server": "Vercel",
+    "Strict-Transport-Security": "max-age=63072000",
+    "X-Matched-Path": "/robots.txt",
+    "X-Vercel-Cache": "HIT",
+    "X-Vercel-Id": "yul1::pqhqq-1793095499394-af62e24d8b14",
+    "Connection": "close"
+  },
+  "bytes": 114
+}

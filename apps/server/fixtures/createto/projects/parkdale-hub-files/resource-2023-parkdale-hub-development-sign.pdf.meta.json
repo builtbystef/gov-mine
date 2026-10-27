@@ -1,0 +1,28 @@
+{
+  "url": "https://a-us.storyblok.com/f/1017201/x/781832e756/resource-2023-parkdale-hub-development-sign.pdf",
+  "final_url": "https://a-us.storyblok.com/f/1017201/x/781832e756/resource-2023-parkdale-hub-development-sign.pdf",
+  "status": 200,
+  "error": null,
+  "fetched_at": "2026-10-27T10:05:10+00:00",
+  "user_agent": "gov-mine-fixtures/0.1",
+  "headers": {
+    "Content-Type": "application/pdf",
+    "Content-Length": "11020725",
+    "Connection": "close",
+    "Accept-Ranges": "bytes",
+    "Date": "Mon, 26 Oct 2026 13:35:39 GMT",
+    "Server": "AmazonS3",
+    "Last-Modified": "Tue, 07 Nov 2023 22:03:30 GMT",
+    "ETag": "\"28c8026cd6a2f3574cf49bc4037830a3\"",
+    "x-amz-version-id": "zpIYdQGeDJy_ilbCq_Huco0FZkTIvRjA",
+    "Cache-Control": "public; max-age=31536000",
+    "Expires": "Wed, 06 Nov 2024 22:03:29 GMT",
+    "x-amz-server-side-encryption": "AES256",
+    "X-Cache": "Hit from cloudfront",
+    "Via": "1.1 b17b94cbc6db5cb82e8f8d6e55e1e85a.cloudfront.net (CloudFront)",
+    "X-Amz-Cf-Pop": "YTO50-P1",
+    "X-Amz-Cf-Id": "OtSM5mUexpQ6UC6R6NRp-3etWkgawwCmLt3uLA2ueVlxm-K8hhbTUw==",
+    "Age": "73771"
+  },
+  "bytes": 11020725
+}

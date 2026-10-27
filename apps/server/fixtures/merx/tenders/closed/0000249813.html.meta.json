@@ -1,0 +1,25 @@
+{
+  "url": "https://www.merx.com/buildtorontotplc/solicitations/Transportation-Consulting-Services-at-1113-1117-Dundas-Street-West/0000249813?origin=0",
+  "final_url": "https://www.merx.com/buildtorontotplc/solicitations/Transportation-Consulting-Services-at-1113-1117-Dundas-Street-West/0000249813?origin=0",
+  "status": 200,
+  "error": null,
+  "fetched_at": "2026-10-27T10:10:29+00:00",
+  "user_agent": "gov-mine-fixtures/0.1",
+  "request_headers": {},
+  "headers": {
+    "Date": "Tue, 27 Oct 2026 10:10:29 GMT",
+    "Content-Type": "text/html;charset=utf-8",
+    "Transfer-Encoding": "chunked",
+    "Connection": "close",
+    "Set-Cookie": "AWSALB=fMBH13buhGueczqss8XY1e4ft5hoBwaD0X/cBNz9JYh+NfeFAoADCU0EBoY7+QiYPxCmt9DMo9Xc9x3qx2KgRpvM2rR8121IC5r3Thx2xWaEeCNdkGiV+tFieNMg; Expires=Tue, 03 Nov 2026 10:10:28 GMT; Path=/",
+    "X-OneAgent-JS-Injection": "true",
+    "Server-Timing": "dtTrId;desc=\"458c837e3796a788a38b7f0cae1a118f\", dtRpid;desc=\"1397723713\", dtSInfo;desc=\"0\"",
+    "Strict-Transport-Security": "max-age=31536000;includeSubDomains;preload",
+    "Pragma": "no-cache",
+    "Cache-Control": "no-cache",
+    "Expires": "Thu, 01 Jan 1970 00:00:00 GMT",
+    "X-Frame-Options": "SAMEORIGIN",
+    "Content-Language": "en"
+  },
+  "bytes": 71903
+}

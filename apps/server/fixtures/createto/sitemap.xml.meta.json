@@ -1,0 +1,27 @@
+{
+  "url": "https://createto.ca/sitemap.xml",
+  "final_url": "https://createto.ca/sitemap.xml",
+  "status": 200,
+  "error": null,
+  "fetched_at": "2026-10-27T10:05:00+00:00",
+  "user_agent": "gov-mine-fixtures/0.1",
+  "headers": {
+    "Accept-Ranges": "bytes",
+    "Access-Control-Allow-Origin": "*",
+    "Age": "37455",
+    "Cache-Control": "public, max-age=0, must-revalidate",
+    "Content-Disposition": "inline; filename=\"sitemap.xml\"",
+    "Content-Length": "185",
+    "Content-Type": "application/xml",
+    "Date": "Tue, 27 Oct 2026 10:05:00 GMT",
+    "Etag": "\"30095e7adf6ceb5d5e74a97aeb142015\"",
+    "Last-Modified": "Mon, 26 Oct 2026 23:40:45 GMT",
+    "Server": "Vercel",
+    "Strict-Transport-Security": "max-age=63072000",
+    "X-Matched-Path": "/sitemap.xml",
+    "X-Vercel-Cache": "HIT",
+    "X-Vercel-Id": "yul1::gnwzk-1793095500949-5c0048fd82ee",
+    "Connection": "close"
+  },
+  "bytes": 185
+}
