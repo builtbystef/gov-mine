@@ -5,7 +5,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from gov_mine.shared.logs import RequestIdFilter, request_id
+from gov_mine.shared.logs import ContextFilter, request_id
 from gov_mine.shared.middleware import INTERNAL_ERROR_DETAIL, RequestIdMiddleware
 
 if TYPE_CHECKING:
@@ -57,7 +57,7 @@ def test_replaces_an_unusable_incoming_request_id(failing_client: TestClient, ba
 def test_unhandled_error_becomes_a_500_with_the_request_id(
     failing_client: TestClient, caplog: pytest.LogCaptureFixture
 ):
-    caplog.handler.addFilter(RequestIdFilter())
+    caplog.handler.addFilter(ContextFilter())
     with caplog.at_level(logging.ERROR, logger="gov_mine.shared.middleware"):
         response = failing_client.get("/boom", headers={"X-Request-ID": "report-42"})
     assert response.status_code == 500
@@ -74,7 +74,7 @@ def test_unhandled_error_becomes_a_500_with_the_request_id(
 def test_each_request_gets_an_access_log_line(
     failing_client: TestClient, caplog: pytest.LogCaptureFixture
 ):
-    caplog.handler.addFilter(RequestIdFilter())
+    caplog.handler.addFilter(ContextFilter())
     with caplog.at_level(logging.INFO, logger="gov_mine.access"):
         failing_client.get("/ok", headers={"X-Request-ID": "report-7"})
         failing_client.get("/boom")
@@ -88,6 +88,6 @@ def test_each_request_gets_an_access_log_line(
 
 
 def test_log_lines_outside_a_request_read_dash(caplog: pytest.LogCaptureFixture):
-    caplog.handler.addFilter(RequestIdFilter())
+    caplog.handler.addFilter(ContextFilter())
     log.warning("no request here")
     assert getattr(caplog.records[-1], "request_id", None) == "-"

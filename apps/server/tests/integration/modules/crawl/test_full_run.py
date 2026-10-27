@@ -5,6 +5,9 @@ CreateTO homepage."""
 
 import asyncio
 import hashlib
+import json
+import logging
+import re
 import time
 import uuid
 from contextlib import suppress
@@ -28,6 +31,7 @@ from gov_mine.integrations.storage.memory import MemoryObjectStore
 from gov_mine.main import create_app
 from gov_mine.modules.crawl.models import CrawlRun, RunStatus
 from gov_mine.resources import build_resources, worker_context
+from gov_mine.shared.logs import ContextFilter, JsonFormatter
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -231,3 +235,43 @@ def test_a_full_run_crawls_the_homepage_into_a_snapshot(crawl_settings: Settings
     (item,) = fetches["items"]
     assert item["outcome"] == "fetched"
     assert item["snapshot"]["id"] == str(snapshot["id"])
+
+
+def test_a_runs_log_lines_carry_its_run_job_and_webpage_ids(
+    crawl_settings: Settings, database: Engine, caplog: pytest.LogCaptureFixture
+):
+    invoke("seed")
+    (institution,) = rows(database, "SELECT id FROM institutions")
+    _, output = invoke("run", "create", str(institution["id"]), "--full")
+    run_id = output.strip()
+
+    caplog.handler.addFilter(ContextFilter())
+    caplog.handler.setFormatter(JsonFormatter())
+    with caplog.at_level(logging.INFO):
+        asyncio.run(crawl(crawl_settings, run_id, Website()))
+
+    lines = [json.loads(line) for line in caplog.text.splitlines()]
+    job_done = re.compile(r"(crawl\.start|crawl\.fetch)\[(\d+)\] done in .*")
+    done = {
+        match[1]: (int(match[2]), line)
+        for line in lines
+        if (match := job_done.fullmatch(line["message"]))
+    }
+    (fetch,) = rows(database, "SELECT webpage_id FROM fetches")
+
+    fetch_job_id, fetch_line = done["crawl.fetch"]
+    assert fetch_line["run_id"] == run_id
+    assert fetch_line["job_id"] == fetch_job_id
+    assert fetch_line["webpage_id"] == str(fetch["webpage_id"])
+    # The HTTP client's own line, written inside the fetch, carries the same.
+    (request,) = [line for line in lines if line["logger"] == "httpx"]
+    assert (request["run_id"], request["job_id"], request["webpage_id"]) == (
+        run_id,
+        fetch_job_id,
+        str(fetch["webpage_id"]),
+    )
+
+    start_job_id, start_line = done["crawl.start"]
+    assert start_line["run_id"] == run_id
+    assert start_line["job_id"] == start_job_id
+    assert "webpage_id" not in start_line

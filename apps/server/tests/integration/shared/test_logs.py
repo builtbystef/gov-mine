@@ -5,7 +5,7 @@ import pytest
 
 from gov_mine.jobs.tasks import defer, task
 from gov_mine.resources import Resources
-from gov_mine.shared.logs import RequestIdFilter, request_id
+from gov_mine.shared.logs import ContextFilter, request_id
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
@@ -41,7 +41,7 @@ def test_a_job_runs_under_the_request_id_that_queued_it(
         finally:
             request_id.reset(token)
 
-    caplog.handler.addFilter(RequestIdFilter())
+    caplog.handler.addFilter(ContextFilter())
     assert client.portal is not None
     with caplog.at_level(logging.INFO, logger="gov_mine.tests"):
         assert client.portal.call(queue_inside_request) == "report-9"

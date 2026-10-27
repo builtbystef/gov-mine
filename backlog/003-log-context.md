@@ -9,9 +9,9 @@ Every log line a job writes carries the run id, the job id and, where there is o
 
 ## Acceptance criteria
 
-- [ ] A log line written during a `crawl.fetch` job, in JSON format, has `run_id`, `job_id` and `webpage_id` fields matching the job.
-- [ ] A log line written during a job that has no webpage (such as `crawl.start`) has `run_id` and `job_id`, and no `webpage_id`.
-- [ ] A log line written outside any job carries none of the three fields.
+- [x] A log line written during a `crawl.fetch` job, in JSON format, has `run_id`, `job_id` and `webpage_id` fields matching the job.
+- [x] A log line written during a job that has no webpage (such as `crawl.start`) has `run_id` and `job_id`, and no `webpage_id`.
+- [x] A log line written outside any job carries none of the three fields.
 
 ## Notes
 

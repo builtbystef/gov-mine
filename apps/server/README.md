@@ -46,7 +46,7 @@ apps/server/
 
 ## How it works
 
-- **Errors and logs**: every response and log line carries `X-Request-ID`. Unhandled exceptions become a plain 500.
+- **Errors and logs**: every response and log line carries `X-Request-ID`. A line written inside a job also carries `job_id`, and the `run_id` and `webpage_id` the job was queued with (`LOGGED_ARGUMENTS` in `jobs/tasks.py`), as JSON fields with `GOV_MINE_LOG_FORMAT=json`. Unhandled exceptions become a plain 500.
 - **Database**: SQLAlchemy 2 async over psycopg 3, migrations with Alembic.
 - **Storage**: S3-compatible (RustFS locally); downloads use presigned URLs.
 - **Jobs**: [Procrastinate](https://procrastinate.readthedocs.io) on the app's PostgreSQL, with no broker.

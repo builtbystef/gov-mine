@@ -2,7 +2,8 @@ import json
 import logging
 from typing import TYPE_CHECKING
 
-from gov_mine.shared.logs import JsonFormatter, RequestIdFilter, TextFormatter, request_id
+from gov_mine.jobs.context import running
+from gov_mine.shared.logs import ContextFilter, JsonFormatter, TextFormatter, request_id
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
 
 def record(message: str, exc_info: ExcInfo | None = None) -> logging.LogRecord:
     rec = logging.LogRecord("gov_mine.tests", logging.INFO, __file__, 1, message, (), exc_info)
-    RequestIdFilter().filter(rec)
+    ContextFilter().filter(rec)
     return rec
 
 
@@ -39,3 +40,23 @@ def test_json_lines_are_one_object_each():
     assert line["time"].endswith("Z")
     assert "ValueError: nope" in line["exception"]
     assert "\n" not in JsonFormatter().format(record("one\nline"))
+
+
+def test_json_lines_inside_a_job_carry_its_ids():
+    with running("crawl.fetch", 7, None, {"run_id": "run-1", "webpage_id": "page-1"}):
+        line = json.loads(JsonFormatter().format(record("fetching")))
+    assert (line["run_id"], line["job_id"], line["webpage_id"]) == ("run-1", 7, "page-1")
+
+
+def test_json_lines_of_a_job_without_a_webpage_carry_no_webpage_id():
+    with running("crawl.start", 8, None, {"run_id": "run-1"}):
+        line = json.loads(JsonFormatter().format(record("starting")))
+    assert (line["run_id"], line["job_id"]) == ("run-1", 8)
+    assert "webpage_id" not in line
+
+
+def test_json_lines_outside_a_job_carry_none_of_its_ids():
+    with running("crawl.fetch", 7, None, {"run_id": "run-1", "webpage_id": "page-1"}):
+        pass
+    line = json.loads(JsonFormatter().format(record("idle")))
+    assert not {"run_id", "job_id", "webpage_id"} & line.keys()

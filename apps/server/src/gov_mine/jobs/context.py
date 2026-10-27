@@ -1,10 +1,10 @@
 import logging
 import time
-from collections.abc import Generator
+from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 
 from gov_mine.shared import telemetry
-from gov_mine.shared.logs import new_request_id, request_id
+from gov_mine.shared.logs import job_ids, new_request_id, request_id
 
 type Trace = dict[str, str]
 
@@ -24,11 +24,15 @@ def trace() -> Trace:
 
 
 @contextmanager
-def running(name: str, job_id: int | None, carrier: Trace | None) -> Generator[None]:
+def running(
+    name: str, job_id: int | None, carrier: Trace | None, ids: Mapping[str, str]
+) -> Generator[None]:
     """The context a run executes in. A job the schedule sent, or a retry of one,
-    has no request: it gets an ID of its own, so its lines still group."""
+    has no request: it gets an ID of its own, so its lines still group. Every line
+    also carries the job's ID and `ids` (its run and webpage, where it has them)."""
     carrier = carrier or {}
     token = request_id.set(carrier.get(REQUEST_ID) or new_request_id())
+    ids_token = job_ids.set({**ids} if job_id is None else {**ids, "job_id": job_id})
     started = time.perf_counter()
     try:
         with telemetry.job_span(name, job_id, carrier):
@@ -39,6 +43,7 @@ def running(name: str, job_id: int | None, carrier: Trace | None) -> Generator[N
     else:
         log.info("%s[%s] done in %.1fms", name, job_id, _ms(started))
     finally:
+        job_ids.reset(ids_token)
         request_id.reset(token)
 
 

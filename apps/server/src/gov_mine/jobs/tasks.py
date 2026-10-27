@@ -21,6 +21,10 @@ if TYPE_CHECKING:
 # growing from a quarter of a minute to about four.
 RETRY_ON_ERROR = RetryStrategy(max_attempts=5, wait=10, exponential_wait=4)
 
+# Job arguments every log line of the run carries (shared/logs.py), so one run's or
+# one page's activity can be filtered out of the logs.
+LOGGED_ARGUMENTS = ("run_id", "webpage_id")
+
 # Arguments after `Resources` are the job's, and must be JSON.
 type JobFunction[**P, R] = Callable[Concatenate[Resources, P], Awaitable[R]]
 # Positional arguments are not stored, so a task is always deferred with keywords.
@@ -43,7 +47,8 @@ def task(
             if cron is not None:
                 # The tick, as Procrastinate sends it. No job here needs it.
                 kwargs.pop("timestamp", None)
-            with running(name, context.job.id, trace):
+            ids = {key: str(kwargs[key]) for key in LOGGED_ARGUMENTS if key in kwargs}
+            with running(name, context.job.id, trace, ids):
                 return await func(resources_of(context), **kwargs)
 
         registered: AnyTask = registry.task(name=name, pass_context=True, retry=retry or False)(run)
