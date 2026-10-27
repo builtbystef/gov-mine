@@ -296,6 +296,23 @@ def test_a_staff_directory_yields_a_contact_per_person(
     }
 
 
+def test_an_item_listed_twice_in_a_document_is_one_record_not_an_amendment(
+    db: Database, object_store: MemoryObjectStore, openrouter: OpenRouter
+):
+    # A board agenda names its meeting at the top and again further down.
+    openrouter.answers[TEAM] = {
+        "document_date": None,
+        "records": [ADA, _person("Ada Lovelace", "Planner")],
+    }
+    run_id = db.run(_document, db, TEAM, DocumentType.STAFF_DIRECTORY)
+    db.run(_store, db, object_store, run_id, TEAM, TEAM_PAGE)
+
+    (record,) = db.run(_rows, db, Record)
+    assert record.key == "Ada Lovelace"
+    (snapshot,) = db.run(_rows, db, RecordSnapshot)
+    assert snapshot.data["title"] == "Chief Executive Officer"
+
+
 def test_a_failing_model_is_retried_once_then_recorded(
     db: Database, object_store: MemoryObjectStore, openrouter: OpenRouter
 ):

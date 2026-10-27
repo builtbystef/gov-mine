@@ -331,6 +331,9 @@ async def _write_records(  # noqa: PLR0913
     if record_data.key_field is None:
         drafts = drafts[:1]
     invalid: list[str] = []
+    # A document can list the same item twice (a board agenda naming its meeting at the top and
+    # again in its minutes); the first is kept, so a second is not written as an amendment.
+    keys: set[str] = set()
     for draft in drafts:
         values, cited = draft_data(draft)
         try:
@@ -338,6 +341,9 @@ async def _write_records(  # noqa: PLR0913
         except ValidationError as exc:
             invalid.append(str(exc))
             continue
+        if record.key() in keys:
+            continue
+        keys.add(record.key())
         await _upsert(
             session,
             document=document,
