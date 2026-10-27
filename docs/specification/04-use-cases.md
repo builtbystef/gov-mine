@@ -9,7 +9,7 @@
 - Preconditions: the institution row exists with a `website_url`; PostgreSQL and object storage
   are running; a worker is running; model keys are configured.
 - Main steps:
-  1. Operator runs `gov-mine run create createto --full`.
+  1. Operator runs `gov-mine run create <institution id> --full`.
   2. The run is queued; the worker fetches robots.txt and the sitemap for the host, then the
      homepage, and follows every in-scope link breadth-first, writing a `fetches` row per
      attempt and a `webpage_snapshots` row per new content hash.
@@ -26,13 +26,27 @@
   6. The run finishes; `gov-mine run report <id>` prints the numbers.
 - Alternative flows, including failures:
   - robots.txt disallows a path: the link gets a `blocked_robots` fetch and no request.
-  - A link is off-scope, an unsupported type, or too large: `skipped_*` fetch, no request.
-  - A request times out or returns 5xx: `failed_http` or `failed_timeout`; retried up to three
-    times with backoff within the run; the run continues.
-  - A file cannot be parsed: snapshot `text_status = failed` with `text_error`; the fetch is
-    `failed_parse`; the bytes are kept.
+  - A link is off-scope, too deep (more than 50 links from a seed), an unsupported type, or
+    too large (over 100 MB): a `skipped_*` fetch. Scope, depth and a known extension are
+    decided before any request; an unknown type or size from the GET response's headers,
+    before the body is read.
+  - A request times out or returns 429 or 5xx: `failed_timeout` or `failed_http`, one
+    `fetches` row per try; retried up to three times with backoff within the run; the run
+    continues. Any other 4xx is one `failed_http` row and no retry; a 404 also sets
+    `webpages.missing_since`.
+  - A file cannot be parsed: snapshot `text_status = failed` with `text_error`; the fetch stays
+    `fetched` (the request succeeded); the bytes are kept.
   - A model call fails: the extraction row records the error; retried once; the document stays
     unextracted and appears in the report.
+  - A link to a video or audio (youtube.com, youtu.be, vimeo.com, or a video or audio
+    extension): a `skipped_type` fetch with reason `video`, no request, and a `youtube`
+    document of the run's institution with no snapshot.
+  - The homepage on a full run, or every due listing page on an incremental run, ends
+    `failed_*` with no snapshot: the run is `failed`, with the error in `crawl_runs.error`.
+  - The run's model cost passes its ceiling (`max_cost`, default USD 5): no more
+    classification or model extraction is queued and scanned PDF pages are not OCR'd
+    (`text_status = partial`); fetching, parsing and rule extraction continue. Pages skipped
+    this way wait until their content next changes.
   - The worker dies mid-run: within ten minutes of a worker restarting, the stalled-job sweep
     puts its unfinished jobs back in the queue; the run resumes.
 - Expected result: a snapshot of every page and file, a few sources, a few hundred documents,
@@ -84,9 +98,12 @@
 - Goal: show an unchanged run, a changed source and a failed file without waiting for the site
   to change.
 - Actors: Operator.
-- Main steps: run twice (unchanged). Then `gov-mine dev replay` serves saved local copies with
-  one project page edited (phase changed) and one PDF replaced by a corrupt file, and a run is
-  pointed at it. The report and `gov-mine records history <id>` show the amended record and the
+- Main steps: run twice (unchanged). Then `gov-mine dev replay` serves the saved copies in
+  `fixtures/` with one project page edited (phase changed) and one PDF replaced by a corrupt
+  file, and a run is started with `--replay <address>`. A replay run sends every request,
+  whatever its host, to the replay server, and fetches only URLs in the saved set: any other
+  URL gets a `skipped_scope` fetch with reason `not_in_replay`, so a replay never marks a live
+  page missing. The report and `gov-mine records history <id>` show the amended record and the
   failed snapshot.
 - Business rules: replayed runs are marked in `crawl_runs.settings` so they are never confused
   with live runs.
@@ -95,12 +112,13 @@
 
 - Goal: hand the records to a downstream system.
 - Actors: Operator; downstream service.
-- Main steps: `gov-mine export --since 2021-10-26 --out out/` writes one JSON Lines file per
-  record type, one for citations, one for documents, and a `manifest.json` with the run id,
-  extractor versions and counts.
+- Main steps: `gov-mine export [--since <date>] --out out/` writes one JSON Lines file per
+  record type, one for citations, one for documents, and a `manifest.json` with the export
+  time, the cutoff, the latest finished run of each institution exported, the extractor
+  versions and the line count per file.
 - Business rules: every record carries its citations' webpage URL, page and excerpt; a document
-  dated before `--since` is left out, an undated one is kept; the export is reproducible from
-  the database alone.
+  dated before `--since` (by default, the five-year cutoff on the day of the export) is left
+  out, an undated one is kept; the export is reproducible from the database alone.
 
 ## UC-006: Add a rule extractor for a page family
 
@@ -110,12 +128,15 @@
   CreateTO project pages (`/projects/*`).
 - Main steps: write the extractor config (for createto.ca, JSON paths into `__NEXT_DATA__`; for
   other sites, CSS selectors); run `gov-mine extract --dry-run --source <id>` against stored
-  snapshots; compare with the model's output; store the config, with its URL pattern, on the
-  source. From then on every document whose URL matches the pattern uses the rule, whether or
-  not it was found under that source.
-- Alternative flows: the rule's output fails Pydantic validation on a page → the model runs
-  with `fallback_reason = validation_failed`; a rule that fails on many pages is the alarm that
-  the template changed.
+  snapshots; compare with the model's output; attach it to the source with
+  `gov-mine sources set-rule <source id> rule:createto_project@1`, which copies that rule's
+  config and URL pattern, kept in code under its name, into `sources.extractor_config`. From
+  then on every document whose URL matches the pattern uses the rule, whether or not it was
+  found under that source.
+- Alternative flows: the rule's output fails Pydantic validation on a page (every record type
+  requires its identifying field, such as a project's name, so a template change that breaks
+  that field's path fails here) → the model runs with `fallback_reason = validation_failed`;
+  a rule that fails on many pages is the alarm that the template changed.
 - Business rules: a rule extractor is a named version (`rule:createto_project@1`). A new
   version, like a changed prompt, is applied to stored pages only when rerun by hand (`gov-mine
   extract --rerun`).
@@ -197,9 +218,11 @@
      `origin = award`.
 - Alternative flows: a tender whose Issuing Organization does not contain the institution's
   name (a keyword match on someone else's tender) is kept as a snapshot and yields no document.
-  Login-only panels (documents, plan holders) never match a pattern and are never fetched. A
-  changed MERX template fails validation, which shows as `fallback_reason = validation_failed`.
-- Expected result: for CreateTO, about 120 tenders and 84 awards from about 215 requests
-  (about 18 minutes at 5 s), with no model calls.
+  Login-only panels (documents, plan holders) and rows that link to a login-gated notice
+  (`/public/supplier/interception/...`) never match a pattern and are never fetched. A changed
+  MERX template fails validation, which shows as `fallback_reason = validation_failed`.
+- Expected result: for CreateTO, the 108 tenders the search tabs reach and their 74 awards,
+  from about 192 requests (10 search pages, 108 tender pages, 74 award panels; about 16
+  minutes at 5 s), with no model calls.
 - Business rules: the MERX source is revisited weekly; an awarded tender is final and is not
   revisited; documents dated before the cutoff are kept but not exported.

@@ -9,16 +9,16 @@
   and faked in tests. This is the structure of Alloy, the template the repository starts
   from (section 3), chosen because it is already proven.
 - Technologies and technical restrictions: Python 3.14, uv, FastAPI, Typer (CLI), SQLAlchemy 2
-  async, Alembic, Procrastinate, PostgreSQL 18, Next.js 16 with shadcn/ui and TanStack Query for
-  the dashboard (reusing Alloy's app shell and generated API client), httpx (HTTP/2, conditional
-  requests), selectolax for HTML compaction, markdownify for HTML to markdown (the converter
-  MarkItDown uses for HTML, so pages and files read alike), MarkItDown for PDF and office files
-  with the `markitdown-ocr` plugin for scans, Pydantic for record types and structured outputs,
-  Pydantic AI over OpenRouter for the extraction and OCR model (Alloy already ships it and
-  records its calls), TypeSafe's Jev 1.14 for classification (through Pydantic AI if the
-  Decisions API allows, else a thin httpx adapter behind the same port), RustFS locally as
-  S3-compatible storage, Ruff, ty, pytest, Vitest. No browser for crawling: the target is
-  server-rendered. Playwright stays a port that is not implemented.
+  async, Alembic, Procrastinate, PostgreSQL 18, Next.js 16 with shadcn/ui and TanStack Query
+  for the dashboard (reusing Alloy's app shell and generated API client), httpx (HTTP/2,
+  conditional requests), selectolax for HTML compaction, markdownify for HTML to markdown (the
+  converter MarkItDown uses for HTML, so pages and files read alike), MarkItDown for PDF and
+  office files with the `markitdown-ocr` plugin for scans, Pydantic for record types and
+  structured outputs, Pydantic AI over OpenRouter for the extraction and OCR model (Alloy
+  already ships it and records its calls), TypeSafe's Jev 1.14 for classification (a thin httpx
+  adapter behind the same port: the Decisions API is not chat completions, so Pydantic AI does
+  not apply), RustFS locally as S3-compatible storage, Ruff, ty, pytest, Vitest. No browser for
+  crawling: the target is server-rendered. Playwright stays a port that is not implemented.
 - External systems and integrations: the target websites (createto.ca, a-us.storyblok.com,
   toronto.ca, partner hosts); OpenRouter, for `openai/gpt-6-luna` (extraction),
   `typesafe/jev-1.14` (classification, Decisions API) and OCR of scans (`openai/gpt-6-luna`);

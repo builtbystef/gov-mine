@@ -97,9 +97,48 @@
       PostgreSQL, bucket) with the least setup, and the demo is short-lived. Trade: anyone
       with the link can start runs and spend model budget; the per-run cost ceiling (USD 5)
       and the OpenRouter key's limit bound it. Auth comes back from Alloy if the app stays up.
+  27. A page costs one request. Type and size are decided from the extension, then from the
+      GET response's headers before the body is read, not from a HEAD request, which would
+      double the requests of an unchanged run. Trade: a refused file has opened a
+      connection.
+  28. One `fetches` row per HTTP attempt, retries included, so the request count in the
+      report is a count of rows.
+  29. The five-year window rolls: each run's cutoff is its start date minus five years,
+      recorded in its settings, so runs stay comparable and the window never goes stale.
+      Trade: a document ages out of the export without anything about it changing.
+  30. There is no `mostly_empty` fallback. Each record type requires its identifying field,
+      so a rule broken by a template change fails validation and the model runs
+      (`validation_failed`). Trade: a rule that still finds the name but loses other fields
+      is not caught by itself; the record snapshot's diff shows it.
+  31. The fence's limits: 100 MB per file (planning PDFs run to tens of MB; the cap guards
+      memory and storage against datasets, archives and decompression bombs); 50 links from a
+      seed (CreateTO is a few links deep; the limit stops crawler traps such as endless
+      calendars, while leaving room for long paginated listings); `--limit N` on a run, a
+      development knob that caps requests sent.
+  32. A replay run sends every request to the replay server and fetches only the saved URLs,
+      so the variants run against the real database without marking live pages missing.
+  33. Past its cost ceiling a run keeps fetching but queues no paid work; the pages it
+      skipped wait until their content changes. Trade: they stay unclassified until then.
+  34. MERX's search tabs are walked as they are. Their pagination repeats rows, so some
+      tenders appear on no page (108 distinct tenders were reached on 2026-10-27). Trade: those
+      tenders are missed; reaching them is a later addition.
+  35. Contacts come from `staff_directory` documents (a staff directory, team, leadership,
+      board or council page), which yield one `contact` record per person. One name across
+      institution types; an org chart that is only an image yields nothing.
+  36. Jev's input is sized in bytes, not tokens: the request stays under 32,000 bytes, the
+      limit of TypeSafe's default mode, with the link list capped first and the text filling
+      the rest. One 25-way choice in one request, as TypeSafe recommends against chaining
+      requests. Trade: a long PDF is classified from its opening pages only.
+  37. A parse failure is recorded on the snapshot (`text_status = failed`, `text_error`), not
+      as a fetch outcome: parsing runs after the fetch row is written, and fetches are
+      append-only. The report counts failed files from the snapshots.
+  38. A private or link-local address is refused as `skipped_scope` with reason
+      `private_address`, like any other out-of-scope URL.
 - Assumptions: none at the time of writing.
 - Open questions and owners: none at the time of writing.
 - Possible later additions (not in phase 1; owner: the author):
+  - Reach the MERX tenders the paginated tabs skip, for example with another sort order or
+    date-range filters (decision 34).
   - Check the value as well as the excerpt. The quote check confirms an excerpt is on the
     page, not that it supports the field: `start_date = 2024-03-01` with the excerpt
     "Construction is expected to begin in 2025" passes today. A later check would require the

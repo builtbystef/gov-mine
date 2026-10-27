@@ -12,7 +12,16 @@
   monthly cost of running gov-mine hosted on its schedule, labelled as an estimate: Railway's
   usage pricing for the web, API and worker services and PostgreSQL, and the bucket priced by
   the GB the snapshots take (read from the database). The prices are a hosting price list in
-  code, next to the model price list, with the date they were checked.
+  code, next to the model price list, with the date they were checked. On 2026-10-27
+  (railway.com/pricing): USD 20 per vCPU-month and 10 per GB-month of memory, billed per second
+  on actual use; volumes 0.15 per GB-month; buckets 0.015 per GB-month with free egress;
+  service egress 0.05 per GB; the Hobby plan USD 5 a month and Pro USD 20, each including that
+  much usage. Railway bills use, not allocation, so the estimate assumes an average use per
+  service, kept in the same price list: web and API 0.05 vCPU and 0.25 GB each, the worker 0.1
+  vCPU and 0.5 GB, PostgreSQL 0.05 vCPU and 0.5 GB plus a volume the size of the database
+  (`pg_database_size`); the bucket is the snapshots' total `size_bytes`. On those assumptions
+  it is about USD 20 a month (memory 15, CPU 5, storage cents), before the plan's included
+  usage.
 - Build and deployment process: `uv sync`; `pnpm install`; `vp run db:up` (PostgreSQL and
   RustFS in Docker Compose); `vp run db:migrate`; `uv run gov-mine seed`; one command (`vp run
   dev`, as in Alloy) starts the API, a worker with the scheduler, and the dashboard.

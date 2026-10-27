@@ -21,11 +21,12 @@
 
 ## 3. Break the spec into tickets
 
-- [ ] Run `/spec-to-tickets docs/specification/README.md` and tell it the spec is every file
+- [x] Run `/spec-to-tickets docs/specification/README.md` and tell it the spec is every file
       the README links to.
-- [ ] Answer its gap questions; approve the ticket list and coverage table.
-- [ ] Ticket 1 is the thinnest end-to-end path: seed CreateTO, crawl one page, store a
-      snapshot, show it on the run page.
+- [x] Answer its gap questions; approve the ticket list and coverage table.
+- [x] The thinnest end-to-end path (seed CreateTO, crawl one page, store a snapshot, show it on
+      the run page) is ticket 002, after 001 replaces the `gov-mine-worker` script with
+      `gov-mine worker`. The backlog is `backlog/001` to `backlog/057`.
 
 ## 4. Build
 

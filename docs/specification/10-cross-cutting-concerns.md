@@ -10,8 +10,10 @@
 - Error handling: exceptions at ports are typed (`FetchError`, `ParseError`, `ProviderError`,
   `ValidationError`); job functions catch them and write the outcome row, then re-raise only
   when a retry is wanted. No silent `except`.
-- Configuration and secrets: `GOV_MINE_*` environment variables, documented in `.env.example`;
-  pydantic-settings; keys never logged.
+- Configuration and secrets: `GOV_MINE_*` environment variables, documented in
+  `.env.example`; pydantic-settings; keys never logged. Models: `GOV_MINE_OPENROUTER_API_KEY`
+  (unset: nothing calls a model), `GOV_MINE_EXTRACT_MODEL`, `GOV_MINE_CLASSIFY_MODEL` and
+  `GOV_MINE_EXTRACT_REASONING_EFFORT` (default `medium`), replacing Alloy's OpenAI settings.
 - Transactions and consistency: a job's writes and its completion commit together; a snapshot
   is written to object storage before its row is inserted (an orphan object is harmless, an
   orphan row is not); upserts use `ON CONFLICT` on the unique keys in section 5.
