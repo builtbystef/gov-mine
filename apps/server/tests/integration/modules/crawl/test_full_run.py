@@ -1,7 +1,7 @@
 """Full runs end to end: `gov-mine seed`, `gov-mine run create --full`, a worker that crawls
 the site from the homepage, and the API that shows the run. On a database of its own, migrated
 to head, because the worker's jobs commit. Only the website is faked: it serves the saved
-CreateTO homepage, or a small site of its own."""
+CreateTO homepage and sitemap, or a small site of its own."""
 
 import asyncio
 import hashlib
@@ -10,6 +10,7 @@ import logging
 import re
 import time
 import uuid
+from collections import Counter
 from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -29,9 +30,11 @@ from typer.testing import CliRunner
 from gov_mine.cli import app as cli
 from gov_mine.integrations.storage.memory import MemoryObjectStore
 from gov_mine.main import create_app
+from gov_mine.modules.crawl import service
 from gov_mine.modules.crawl.models import CrawlRun, RunStatus
 from gov_mine.resources import build_resources, worker_context
 from gov_mine.shared.logs import ContextFilter, JsonFormatter
+from gov_mine.shared.urls import normalise_url
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -41,7 +44,9 @@ if TYPE_CHECKING:
     from gov_mine.config import Settings
 
 SERVER_ROOT = Path(__file__).resolve().parents[4]
-HOMEPAGE = (SERVER_ROOT / "fixtures" / "createto" / "homepage.html").read_bytes()
+CREATETO = SERVER_ROOT / "fixtures" / "createto"
+HOMEPAGE = (CREATETO / "homepage.html").read_bytes()
+SITEMAP = "https://createto.ca/sitemap.xml"
 DATABASE = "gov_mine_test_crawl"
 # The run must be finished well within this; it takes a few seconds.
 DEADLINE_SECONDS = 30
@@ -89,8 +94,8 @@ def rows(engine: Engine, sql: str, **params: Any) -> list[dict[str, Any]]:
 
 
 class Website:
-    """Serves `pages` (URL to body; a `.pdf` as a PDF, the rest as HTML) and 404 for the rest,
-    and notes the run's status as each request arrives."""
+    """Serves `pages` (URL to body; a `.pdf` as a PDF, an `.xml` as XML, the rest as HTML) and
+    404 for the rest, and notes the run's status as each request arrives."""
 
     def __init__(self, pages: dict[str, bytes] | None = None) -> None:
         self.pages = pages if pages is not None else {"https://createto.ca/": HOMEPAGE}
@@ -106,8 +111,16 @@ class Website:
             self.status_during_fetch.extend(statuses)
         if url not in self.pages:
             return httpx.Response(404)
-        media_type = "application/pdf" if url.endswith(".pdf") else "text/html; charset=utf-8"
+        media_type = {".pdf": "application/pdf", ".xml": "application/xml"}.get(
+            url[url.rfind(".") :], "text/html; charset=utf-8"
+        )
         return httpx.Response(200, content=self.pages[url], headers={"Content-Type": media_type})
+
+    @property
+    def page_requests(self) -> list[str]:
+        """The requests but the one for `/sitemap.xml`, which every run makes first."""
+        assert self.requests[0] == SITEMAP
+        return self.requests[1:]
 
 
 def page(*hrefs: str, script: str = "") -> bytes:
@@ -138,6 +151,27 @@ def fetches_by_url(engine: Engine, run_id: str) -> dict[str, dict[str, Any]]:
     by_url = {fetch["url"]: fetch for fetch in fetches}
     assert len(by_url) == len(fetches), "a URL was attempted twice"
     return by_url
+
+
+async def start(settings: Settings, run_id: str, website: Website) -> list[dict[str, Any]]:
+    """Run `crawl.start` for the run, outside a worker, and return the fetch jobs it queued."""
+    async with (
+        httpx.AsyncClient(transport=httpx.MockTransport(website)) as http,
+        build_resources(settings, object_store=MemoryObjectStore(), http=http) as resources,
+    ):
+        website.session_factory = resources.session
+        async with resources.session() as session:
+            await service.start_run(session, http, uuid.UUID(run_id))
+            await session.commit()
+            jobs = await session.execute(
+                text(
+                    "SELECT w.url, (j.args->>'depth')::int AS depth FROM procrastinate_jobs j"
+                    " JOIN webpages w ON w.id = (j.args->>'webpage_id')::uuid"
+                    " WHERE j.task_name = 'crawl.fetch' AND j.args->>'run_id' = :id ORDER BY j.id"
+                ),
+                {"id": run_id},
+            )
+            return [dict(row._mapping) for row in jobs]  # noqa: SLF001
 
 
 async def crawl(settings: Settings, run_id: str, website: Website) -> MemoryObjectStore:
@@ -219,9 +253,10 @@ def test_a_full_run_crawls_the_homepage_into_a_snapshot(crawl_settings: Settings
     website = Website()
     store = asyncio.run(crawl(crawl_settings, run_id, website))
 
-    # The run went running, then finished.
-    assert website.requests == ["https://createto.ca/"]
-    assert website.status_during_fetch == ["running"]
+    # The host has no sitemap (404): the run went on from the homepage, running, then finished.
+    # The sitemap is read inside `crawl.start`, before `running` is committed.
+    assert website.requests == [SITEMAP, "https://createto.ca/"]
+    assert website.status_during_fetch == ["queued", "running"]
     (run,) = rows(database, "SELECT * FROM crawl_runs WHERE id = :id", id=run_id)
     assert run["status"] == "finished"
     assert run["started_at"] is not None
@@ -303,7 +338,11 @@ def test_a_runs_log_lines_carry_its_run_job_and_webpage_ids(
     assert fetch_line["job_id"] == fetch_job_id
     assert fetch_line["webpage_id"] == str(fetch["webpage_id"])
     # The HTTP client's own line, written inside the fetch, carries the same.
-    (request,) = [line for line in lines if line["logger"] == "httpx"]
+    (request,) = [
+        line
+        for line in lines
+        if line["logger"] == "httpx" and "GET https://createto.ca/ " in line["message"]
+    ]
     assert (request["run_id"], request["job_id"], request["webpage_id"]) == (
         run_id,
         fetch_job_id,
@@ -347,7 +386,7 @@ def test_a_full_run_follows_links_within_the_site_once_each(
     (run,) = rows(database, "SELECT status FROM crawl_runs")
     assert run["status"] == "finished"
     # Every page and file of the site requested once, under its normalised URL.
-    assert sorted(website.requests) == [
+    assert sorted(website.page_requests) == [
         f"{SITE}/",
         f"{SITE}/about",
         f"{SITE}/files/report.pdf",
@@ -389,7 +428,7 @@ def test_a_url_more_than_50_links_from_a_seed_is_not_requested(
     asyncio.run(crawl(crawl_settings, run_id, website))
 
     # /p/n is n links from the homepage: /p/50 is fetched, /p/51 is not.
-    assert website.requests == [f"{SITE}/"] + [f"{SITE}/p/{n}" for n in range(1, 51)]
+    assert website.page_requests == [f"{SITE}/"] + [f"{SITE}/p/{n}" for n in range(1, 51)]
     fetches = fetches_by_url(database, run_id)
     deepest = fetches[f"{SITE}/p/51"]
     assert deepest["outcome"] == "skipped_depth"
@@ -421,7 +460,7 @@ def test_urls_outside_the_website_prefix_are_not_requested(
 
     asyncio.run(crawl(crawl_settings, run_id, website))
 
-    assert sorted(website.requests) == [f"{SITE}/projects", f"{SITE}/projects/a"]
+    assert sorted(website.page_requests) == [f"{SITE}/projects", f"{SITE}/projects/a"]
     refused = {
         url: (fetch["outcome"], fetch["reason"], fetch["duration_ms"])
         for url, fetch in fetches_by_url(database, run_id).items()
@@ -449,9 +488,105 @@ def test_run_create_limit_caps_the_requests_the_run_sends(
 
     (run,) = rows(database, "SELECT status FROM crawl_runs")
     assert run["status"] == "finished"
-    assert len(website.requests) == 3
+    assert len(website.page_requests) == 3
     fetches = fetches_by_url(database, run_id).values()
     assert len([fetch for fetch in fetches if fetch["duration_ms"] is not None]) == 3
     # The rest of the eleven links found wrote nothing, but a refusal, which costs no request.
     assert {fetch["outcome"] for fetch in fetches} <= {"fetched", "skipped_scope"}
     assert len(rows(database, "SELECT id FROM webpages")) > len(fetches)
+
+
+def sitemap_urls() -> list[str]:
+    """Every page URL in the saved CreateTO sitemap files, normalised."""
+    xml = (CREATETO / "sitemap-0.xml").read_text()
+    return [normalise_url(url) for url in re.findall(r"<loc>(.*?)</loc>", xml)]
+
+
+def test_a_full_run_seeds_every_url_of_the_saved_createto_sitemap_at_depth_0(
+    crawl_settings: Settings, database: Engine
+):
+    run_id = create_run()
+    listed = sitemap_urls()
+    assert len(listed) == 232
+    pages = {url: page() for url in listed}
+    website = Website(
+        pages
+        | {
+            f"{SITE}/": HOMEPAGE,
+            SITEMAP: (CREATETO / "sitemap.xml").read_bytes(),
+            f"{SITE}/sitemap-0.xml": (CREATETO / "sitemap-0.xml").read_bytes(),
+        }
+    )
+
+    seeds = asyncio.run(start(crawl_settings, run_id, website))
+
+    # The index first, then the sitemap it points to; then nothing until the worker runs.
+    assert website.requests == [SITEMAP, f"{SITE}/sitemap-0.xml"]
+    # The homepage and every listed URL queued once, all at depth 0. The sitemap lists the
+    # homepage itself, as https://createto.ca.
+    assert seeds[0] == {"url": f"{SITE}/", "depth": 0}
+    assert Counter(seed["url"] for seed in seeds) == Counter({f"{SITE}/", *listed})
+    assert {seed["depth"] for seed in seeds} == {0}
+
+    asyncio.run(crawl(crawl_settings, run_id, website))
+
+    (run,) = rows(database, "SELECT status FROM crawl_runs")
+    assert run["status"] == "finished"
+    # Every listed URL requested once, though the homepage links to 21 of them too.
+    requested = Counter(website.requests)
+    assert {url: requested[url] for url in listed} == dict.fromkeys(listed, 1)
+    assert max(requested.values()) == 1
+    fetches = fetches_by_url(database, run_id)
+    assert {fetches[url]["outcome"] for url in listed} == {"fetched"}
+    # Seeds were found on no page, the ones the homepage links to included.
+    assert b'href="/projects"' in HOMEPAGE
+    assert b'href="/about-us/careers"' in HOMEPAGE
+    found_on = {
+        webpage["url"]: webpage["discovered_from_webpage_id"]
+        for webpage in rows(database, "SELECT url, discovered_from_webpage_id FROM webpages")
+    }
+    assert {found_on[url] for url in listed} == {None}
+
+
+def test_a_sitemap_url_also_found_as_a_link_is_fetched_once(
+    crawl_settings: Settings, database: Engine
+):
+    run_id = create_run()
+    sitemap = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        "<url><loc>https://createto.ca/projects/</loc></url>"
+        "<url><loc>https://createto.ca/about</loc></url>"
+        "</urlset>"
+    )
+    website = Website(
+        {
+            SITEMAP: sitemap.encode(),
+            f"{SITE}/": page("/projects", "/about#team"),
+            f"{SITE}/projects": page("/about", "/projects/a"),
+            f"{SITE}/about": page("/projects?utm_source=nav"),
+            f"{SITE}/projects/a": page("/about"),
+        }
+    )
+
+    asyncio.run(crawl(crawl_settings, run_id, website))
+
+    (run,) = rows(database, "SELECT status FROM crawl_runs")
+    assert run["status"] == "finished"
+    assert sorted(website.page_requests) == [
+        f"{SITE}/",
+        f"{SITE}/about",
+        f"{SITE}/projects",
+        f"{SITE}/projects/a",
+    ]
+    fetches = fetches_by_url(database, run_id)
+    assert {fetch["outcome"] for fetch in fetches.values()} == {"fetched"}
+    webpages = rows(database, "SELECT id, url, discovered_from_webpage_id FROM webpages")
+    ids = {webpage["url"]: webpage["id"] for webpage in webpages}
+    found_on = {webpage["url"]: webpage["discovered_from_webpage_id"] for webpage in webpages}
+    assert found_on == {
+        f"{SITE}/": None,
+        f"{SITE}/projects": None,
+        f"{SITE}/about": None,
+        f"{SITE}/projects/a": ids[f"{SITE}/projects"],
+    }

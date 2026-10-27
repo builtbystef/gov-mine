@@ -9,6 +9,6 @@ When a full run starts, it reads the host's `sitemap.xml`, if there is one, and 
 
 ## Acceptance criteria
 
-- [ ] On a full run of the saved CreateTO site, every URL in `sitemap.xml` and the sitemap files it links to (`sitemap-0.xml`) is fetched at depth 0.
-- [ ] A host with no sitemap (404) still runs from the homepage, and the run finishes normally.
-- [ ] A sitemap URL also found as a link is fetched only once.
+- [x] On a full run of the saved CreateTO site, every URL in `sitemap.xml` and the sitemap files it links to (`sitemap-0.xml`) is fetched at depth 0.
+- [x] A host with no sitemap (404) still runs from the homepage, and the run finishes normally.
+- [x] A sitemap URL also found as a link is fetched only once.

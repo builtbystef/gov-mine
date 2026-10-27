@@ -11,7 +11,7 @@ from gov_mine.resources import Resources
 @task(service.START_TASK)
 async def start(res: Resources, *, run_id: str) -> None:
     async with res.session() as session:
-        await service.start_run(session, uuid.UUID(run_id))
+        await service.start_run(session, res.http, uuid.UUID(run_id))
         await session.commit()
 
 

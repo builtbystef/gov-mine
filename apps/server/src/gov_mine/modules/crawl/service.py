@@ -1,12 +1,12 @@
-"""The crawl: starting a run, fetching a page into the fetch log and queueing the links it holds
-one link deeper, and finishing the run when its jobs are done. The jobs in jobs.py call these,
-one transaction each."""
+"""The crawl: starting a run from the homepage and the sitemap, fetching a page into the fetch
+log and queueing the links it holds one link deeper, and finishing the run when its jobs are
+done. The jobs in jobs.py call these, one transaction each."""
 
 import logging
 import time
 import uuid
 from datetime import timedelta
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 import httpx
 from procrastinate.types import JSONValue
@@ -30,6 +30,7 @@ from gov_mine.modules.crawl.models import (
 from gov_mine.modules.ingest import service as ingest
 from gov_mine.modules.institutions.models import Institution
 from gov_mine.shared.exceptions import NotFoundError
+from gov_mine.shared.sitemaps import parse_sitemap
 from gov_mine.shared.urls import find_links, is_within, normalise_url
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,10 @@ HTML_MEDIA_TYPES = frozenset({"text/html", "application/xhtml+xml"})
 MAX_DEPTH = 50
 # The longest URL `webpages.url` holds; a longer link is not followed.
 MAX_URL_LENGTH = 2048
+# Where a run looks for the host's sitemap.
+SITEMAP_PATH = "/sitemap.xml"
+# The most sitemap files a run reads, the index included: an index can point to thousands.
+MAX_SITEMAPS = 50
 
 # Whether any job of the run other than `crawl.finish` is waiting or running. Every job of a
 # run carries its `run_id`; a job queues its follow-ups in its own transaction, before it is
@@ -125,9 +130,10 @@ async def queue(
     return await defer(session, registry.tasks[task_name], schedule_in=schedule_in, **kwargs)
 
 
-async def start_run(session: AsyncSession, run_id: uuid.UUID) -> None:
-    """Mark a queued run running and queue its seed: the institution's homepage, on its own
-    host as a `crawl` domain. Then queue `crawl.finish`, which waits for the run's jobs."""
+async def start_run(session: AsyncSession, http: httpx.AsyncClient, run_id: uuid.UUID) -> None:
+    """Mark a queued run running and queue its seeds at depth 0: the institution's homepage, on
+    its own host as a `crawl` domain, then every page the host's sitemap lists. Then queue
+    `crawl.finish`, which waits for the run's jobs."""
     run = await get_run(session, run_id)
     if run.status is not RunStatus.QUEUED:
         logger.info("Run %s is %s, not queued: not started again", run.id, run.status)
@@ -139,7 +145,51 @@ async def start_run(session: AsyncSession, run_id: uuid.UUID) -> None:
     domain = await ensure_domain(session, host_of(homepage_url), CrawlPolicy.CRAWL)
     homepage = await ensure_webpage(session, homepage_url, domain.id)
     await queue(session, FETCH_TASK, run_id=str(run.id), webpage_id=str(homepage.id), depth=0)
+    seeds = await read_sitemap(http, homepage_url)
+    queued = await queue_links(session, run.id, None, seeds, 0)
+    logger.info("Run %s seeded with the homepage and %d sitemap URLs", run.id, queued)
     await queue(session, FINISH_TASK, run_id=str(run.id))
+
+
+async def read_sitemap(http: httpx.AsyncClient, homepage_url: str) -> list[str]:
+    """The normalised page URLs listed by `/sitemap.xml` on the homepage's host, and, when it
+    is an index, by the sitemap files it points to on the same host, each once. A file that is
+    missing, fails, or is not a sitemap adds nothing; at most `MAX_SITEMAPS` files are read."""
+    host = host_of(homepage_url)
+    pending = [urljoin(homepage_url, SITEMAP_PATH)]
+    seen = set(pending)
+    pages: dict[str, None] = {}
+    for _ in range(MAX_SITEMAPS):
+        if not pending:
+            break
+        url = pending.pop(0)
+        try:
+            response = await http.get(url)
+        except httpx.HTTPError as exc:
+            logger.warning("Sitemap %s not read: %s", url, type(exc).__name__)
+            continue
+        if response.status_code != httpx.codes.OK:
+            logger.info("Sitemap %s not read: HTTP %d", url, response.status_code)
+            continue
+        try:
+            sitemap = parse_sitemap(response.content)
+        except ValueError as exc:
+            logger.warning("Sitemap %s not read: %s", url, exc)
+            continue
+        for location in sitemap.sitemaps:
+            child = _normalised(location)
+            if child is not None and host_of(child) == host and child not in seen:
+                seen.add(child)
+                pending.append(child)
+        pages |= {page: None for location in sitemap.pages if (page := _normalised(location))}
+    return list(pages)
+
+
+def _normalised(url: str) -> str | None:
+    try:
+        return normalise_url(url)
+    except ValueError:
+        return None
 
 
 def refusal(url: str, website_url: str, depth: int) -> tuple[FetchOutcome, str] | None:
@@ -216,11 +266,15 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
 
 
 async def queue_links(
-    session: AsyncSession, run_id: uuid.UUID, page: Webpage, urls: list[str], depth: int
+    session: AsyncSession,
+    run_id: uuid.UUID,
+    found_on: Webpage | None,
+    urls: list[str],
+    depth: int,
 ) -> int:
     """Queue a fetch at `depth` for each normalised URL in `urls` the run has not queued yet.
-    A URL seen for the first time gets its webpage row, found on `page`; a host seen for the
-    first time, its domain as `files_only`. Returns how many were queued."""
+    A URL seen for the first time gets its webpage row, found on `found_on` (None for a seed);
+    a host seen for the first time, its domain as `files_only`. Returns how many were queued."""
     urls = [url for url in urls if len(url) <= MAX_URL_LENGTH]
     if not urls:
         return 0
@@ -232,7 +286,11 @@ async def queue_links(
     await session.execute(
         insert(Webpage).on_conflict_do_nothing(),
         [
-            {"url": url, "domain_id": domains[host_of(url)], "discovered_from_webpage_id": page.id}
+            {
+                "url": url,
+                "domain_id": domains[host_of(url)],
+                "discovered_from_webpage_id": found_on.id if found_on else None,
+            }
             for url in urls
         ],
     )
@@ -293,6 +351,7 @@ __all__ = [
     "media_type_of",
     "queue",
     "queue_links",
+    "read_sitemap",
     "refusal",
     "start_run",
 ]

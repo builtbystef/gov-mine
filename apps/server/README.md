@@ -20,7 +20,7 @@ apps/server/
 │   ├── integrations/     # ports with their adapters: storage, ai, http (the crawler's client)
 │   ├── jobs/             # the worker, the task registry, and platform tasks (stalled)
 │   ├── db/               # declarative base, checked strings, session, and models.py, which imports every model
-│   └── shared/           # AppError and subclasses, middleware, logs, telemetry, URL normalising and link finding
+│   └── shared/           # AppError and subclasses, middleware, logs, telemetry, URL normalising, link finding and sitemap reading
 ├── alembic/              # migrations
 └── tests/
     ├── unit/
@@ -50,5 +50,5 @@ apps/server/
 - **Database**: SQLAlchemy 2 async over psycopg 3, migrations with Alembic.
 - **Storage**: S3-compatible (RustFS locally); downloads use presigned URLs.
 - **Jobs**: [Procrastinate](https://procrastinate.readthedocs.io) on the app's PostgreSQL, with no broker.
-- **Runs**: `gov-mine run create` queues `crawl.start`, which queues the homepage's fetch at depth 0 and `crawl.finish`. A fetched HTML page queues a fetch one link deeper for every URL in it (`<a href>` and any absolute URL in the raw HTML) that the run has not queued yet; the fence in `crawl.fetch` refuses what is outside the institution's website prefix or more than 50 links deep with a `fetches` row and no request. `--limit N` caps the requests a run sends; the run's advisory lock makes the count and the queueing safe across concurrent fetches. Every job of a run carries `run_id`; `crawl.finish` marks the run finished once no other job with that `run_id` is waiting or running in `procrastinate_jobs`, and looks again every few seconds until then.
+- **Runs**: `gov-mine run create` queues `crawl.start`, which reads the host's `/sitemap.xml` (and the sitemap files an index points to on that host), queues a fetch at depth 0 for the homepage and every URL listed, and queues `crawl.finish`. Reading the sitemap writes no `fetches` row and does not count toward `--limit`. A fetched HTML page queues a fetch one link deeper for every URL in it (`<a href>` and any absolute URL in the raw HTML) that the run has not queued yet; the fence in `crawl.fetch` refuses what is outside the institution's website prefix or more than 50 links deep with a `fetches` row and no request. `--limit N` caps the requests a run sends; the run's advisory lock makes the count and the queueing safe across concurrent fetches. Every job of a run carries `run_id`; `crawl.finish` marks the run finished once no other job with that `run_id` is waiting or running in `procrastinate_jobs`, and looks again every few seconds until then.
 - **Models**: [Pydantic AI](https://pydantic.dev/docs/ai/), turned on by `GOV_MINE_OPENAI_API_KEY`. Every model call is recorded in `model_calls`.
