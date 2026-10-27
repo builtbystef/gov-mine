@@ -1,12 +1,21 @@
-import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
+import { dehydrate, HydrationBoundary, type QueryClient } from "@tanstack/react-query";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { DetailSkeleton } from "@/components/shared/skeletons";
 import { RunDetail } from "@/features/runs/components/run-detail";
-import { runFetchesQuery, runQuery } from "@/features/runs/queries";
-import { parsePageSearch } from "@/features/runs/schemas";
+import {
+  isActive,
+  runAiCallsQuery,
+  runDocumentsQuery,
+  runFetchesQuery,
+  runQuery,
+  runReportQuery,
+  runSnapshotsQuery,
+  runSourcesQuery,
+} from "@/features/runs/queries";
+import { parseRunSearch, type RunSearch } from "@/features/runs/schemas";
 import { unwrap } from "@/lib/api/errors";
 import { api } from "@/lib/api/server-client";
 import { paged, toSearchString, type SearchParams } from "@/lib/lists";
@@ -31,6 +40,30 @@ export default function RunPage({
   );
 }
 
+/** Prefetches the tab the URL is on, with the same key the tab's table asks for. */
+async function prefetchTab(queryClient: QueryClient, id: string, search: RunSearch, live: boolean) {
+  const page = paged({ page: search.page });
+  switch (search.tab) {
+    case "snapshots":
+      return queryClient.prefetchQuery(runSnapshotsQuery(api, id, page, live));
+    case "documents":
+      return queryClient.prefetchQuery(runDocumentsQuery(api, id, page, live));
+    case "sources":
+      return queryClient.prefetchQuery(runSourcesQuery(api, id, page, live));
+    case "ai-calls":
+      return queryClient.prefetchQuery(runAiCallsQuery(api, id, page, live));
+    case undefined:
+      return queryClient.prefetchQuery(
+        runFetchesQuery(
+          api,
+          id,
+          paged({ page: search.page, outcome: search.outcome, q: search.q }),
+          live,
+        ),
+      );
+  }
+}
+
 async function RunContent({
   params,
   searchParams,
@@ -38,17 +71,22 @@ async function RunContent({
   params: Params;
   searchParams: Promise<SearchParams>;
 }) {
-  const [{ id }, search, timeZone] = await Promise.all([params, searchParams, getTimeZone()]);
-  const filters = parsePageSearch(search);
+  const [{ id }, rawSearch, timeZone] = await Promise.all([params, searchParams, getTimeZone()]);
+  const search = parseRunSearch(rawSearch);
   // A missing run is a not-found page, so it is read here rather than prefetched.
   const result = await api.GET("/runs/{run_id}", { params: { path: { run_id: id } } });
   if (result.response.status === 404 || result.response.status === 422) notFound();
+  const run = unwrap(result);
+  const live = isActive(run.status);
   const queryClient = getQueryClient();
-  queryClient.setQueryData(runQuery(api, id).queryKey, unwrap(result));
-  await queryClient.prefetchQuery(runFetchesQuery(api, id, paged(filters)));
+  queryClient.setQueryData(runQuery(api, id).queryKey, run);
+  await Promise.all([
+    queryClient.prefetchQuery(runReportQuery(api, id, live)),
+    prefetchTab(queryClient, id, search, live),
+  ]);
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <RunDetail key={toSearchString(filters)} id={id} fetchFilters={filters} timeZone={timeZone} />
+      <RunDetail key={toSearchString(search)} id={id} search={search} timeZone={timeZone} />
     </HydrationBoundary>
   );
 }

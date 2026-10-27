@@ -1,29 +1,38 @@
 "use client";
 
 import { useSuspenseQuery } from "@tanstack/react-query";
+import Link from "next/link";
 
 import { Detail } from "@/components/shared/detail-list";
 import { PageHeader } from "@/components/shared/layout/page-header";
 import { browserApi } from "@/lib/api/client";
 import { formatDateTime } from "@/lib/formatting/dates";
+import { toSearchString } from "@/lib/lists";
+import { cn } from "@/lib/utils";
 
-import { isActive, runQuery } from "../queries";
-import type { PageSearch } from "../schemas";
+import { isActive, runQuery, runReportQuery } from "../queries";
+import { runTabLabels, runTabs, type RunSearch } from "../schemas";
 import { FetchesTable } from "./fetches-table";
 import { RunCounts } from "./run-counts";
+import { RunReport } from "./run-report";
+import { AiCallsTab, DocumentsTab, SnapshotsTab, SourcesTab } from "./run-tab-tables";
 import { RunStatusBadge } from "./status-badges";
 
-/** A run: what it was asked to do, where it stands, and its fetch log. */
+/** A run: what it was asked to do, its numbers, and what it did, a tab per kind. */
 export function RunDetail({
   id,
-  fetchFilters,
+  search,
   timeZone,
 }: {
   id: string;
-  fetchFilters: PageSearch;
+  search: RunSearch;
   timeZone: string;
 }) {
   const { data: run } = useSuspenseQuery(runQuery(browserApi, id));
+  const live = isActive(run.status);
+  const { data: report } = useSuspenseQuery(runReportQuery(browserApi, id, live));
+  const tab = search.tab ?? "fetches";
+  const tabProps = { runId: run.id, initialPage: search.page, timeZone, live };
 
   return (
     <>
@@ -36,6 +45,9 @@ export function RunDetail({
         }
         description={`Run ${run.id}`}
       />
+      <div className="mb-3">
+        <RunReport report={report} />
+      </div>
       <div className="mb-6">
         <RunCounts run={run} />
       </div>
@@ -47,15 +59,39 @@ export function RunDetail({
         <Detail label="Finished">{formatDateTime(run.finished_at, timeZone)}</Detail>
         <Detail label="Error">{run.error}</Detail>
       </dl>
-      <section className="flex flex-col gap-4">
-        <h3 className="text-lg font-semibold">Fetches</h3>
+      <nav className="mb-4 flex gap-1 overflow-x-auto border-b" aria-label="Run">
+        {runTabs.map((name) => {
+          const query = toSearchString({ tab: name === "fetches" ? undefined : name });
+          return (
+            <Link
+              key={name}
+              href={query ? `/runs/${run.id}?${query}` : `/runs/${run.id}`}
+              aria-current={name === tab ? "page" : undefined}
+              className={cn(
+                "-mb-px border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
+                name === tab
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {runTabLabels[name]}
+            </Link>
+          );
+        })}
+      </nav>
+      {tab === "fetches" && (
         <FetchesTable
           runId={run.id}
-          initialFilters={fetchFilters}
+          initialFilters={search}
+          outcomeCounts={report.fetches_by_outcome}
           timeZone={timeZone}
-          live={isActive(run.status)}
+          live={live}
         />
-      </section>
+      )}
+      {tab === "snapshots" && <SnapshotsTab {...tabProps} />}
+      {tab === "documents" && <DocumentsTab {...tabProps} />}
+      {tab === "sources" && <SourcesTab {...tabProps} />}
+      {tab === "ai-calls" && <AiCallsTab {...tabProps} />}
     </>
   );
 }

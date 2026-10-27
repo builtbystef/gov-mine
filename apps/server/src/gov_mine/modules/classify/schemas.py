@@ -20,3 +20,15 @@ class SourceOutput(BaseModel):
 class DocumentTypeCount(BaseModel):
     document_type: DocumentType
     count: int
+
+
+class DocumentOutput(BaseModel):
+    """A document a run's classifications found."""
+
+    id: uuid.UUID
+    webpage_id: uuid.UUID
+    url: str
+    document_type: DocumentType
+    title: str | None
+    document_date: datetime | None
+    created_at: datetime

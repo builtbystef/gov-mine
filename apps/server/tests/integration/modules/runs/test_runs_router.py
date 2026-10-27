@@ -164,3 +164,49 @@ def test_a_runs_counts_come_from_its_fetch_log(client: TestClient, db: Database)
         "snapshots": 1,
         "cost": "0",
     }
+
+
+def test_a_runs_fetches_filter_by_outcome_and_url(client: TestClient, db: Database):
+    ids = db.run(_seed_runs, db)
+    fetches = f"/runs/{ids['newer']}/fetches"
+
+    skipped = client.get(fetches, params={"outcome": "skipped_scope"}).json()
+    searched = client.get(fetches, params={"q": "ELSEWHERE"}).json()
+    both = client.get(fetches, params={"outcome": "fetched", "q": "elsewhere"}).json()
+
+    assert [item["url"] for item in skipped["items"]] == ["https://createto.ca/elsewhere"]
+    assert skipped["items"][0]["reason"] == "test"
+    assert skipped["total"] == 1
+    assert [item["url"] for item in searched["items"]] == ["https://createto.ca/elsewhere"]
+    assert both["total"] == 0
+    assert client.get(fetches, params={"outcome": "nonsense"}).status_code == 422
+
+
+def test_a_runs_snapshots_and_a_snapshot_are_read_back(client: TestClient, db: Database):
+    ids = db.run(_seed_runs, db)
+
+    page = client.get(f"/runs/{ids['newer']}/snapshots").json()
+    snapshot = client.get(f"/snapshots/{ids['snapshot']}").json()
+
+    assert page["total"] == 1
+    assert page["items"] == [snapshot]
+    assert snapshot["url"] == "https://createto.ca/"
+    assert snapshot["media_type"] == "text/html"
+    assert client.get(f"/runs/{ids['older']}/snapshots").json()["total"] == 0
+    assert client.get(f"/snapshots/{uuid.uuid4()}").status_code == 404
+
+
+def test_a_webpage_has_its_fetches_newest_first_and_its_snapshots(client: TestClient, db: Database):
+    ids = db.run(_seed_runs, db)
+    homepage_id = client.get(f"/runs/{ids['newer']}/fetches").json()["items"][0]["webpage_id"]
+
+    webpage = client.get(f"/webpages/{homepage_id}").json()
+
+    assert webpage["url"] == "https://createto.ca/"
+    assert webpage["domain"] == "createto.ca"
+    assert webpage["missing_since"] is None
+    assert [(f["crawl_run_id"], f["outcome"], f["http_status"]) for f in webpage["fetches"]] == [
+        (str(ids["newer"]), "fetched", 200)
+    ]
+    assert [s["id"] for s in webpage["snapshots"]] == [str(ids["snapshot"])]
+    assert client.get(f"/webpages/{uuid.uuid4()}").status_code == 404

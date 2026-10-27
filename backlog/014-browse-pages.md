@@ -9,8 +9,8 @@ A webpage has a page in the dashboard showing its fetch history and snapshots, a
 
 ## Acceptance criteria
 
-- [ ] `GET /webpages/{id}` returns the URL, its domain, `missing_since`, its fetches (newest first) and its snapshots.
-- [ ] The dashboard's webpage page lists every fetch with run, time, outcome, HTTP status and reason, and every snapshot linked to its snapshot page.
-- [ ] A fetch on the run page links to its webpage's page.
+- [x] `GET /webpages/{id}` returns the URL, its domain, `missing_since`, its fetches (newest first) and its snapshots.
+- [x] The dashboard's webpage page lists every fetch with run, time, outcome, HTTP status and reason, and every snapshot linked to its snapshot page.
+- [x] A fetch on the run page links to its webpage's page.
 - [ ] `gov-mine pages list` prints webpages as a table, and `--json` prints the same rows as JSON.
 - [ ] `gov-mine pages show <id>` prints the webpage with its fetches and snapshots; an unknown id exits non-zero.

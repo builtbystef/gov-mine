@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from gov_mine.modules.crawl.models import FetchOutcome, RunStatus
+from gov_mine.modules.ingest.models import TextStatus
 from gov_mine.modules.ledger.models import AIPurpose
 
 RunTrigger = Literal["cli", "dashboard", "scheduled"]
@@ -75,6 +76,7 @@ class FetchOutput(BaseModel):
     """One attempt at a URL. `snapshot` is the copy it wrote, if it wrote one."""
 
     id: uuid.UUID
+    crawl_run_id: uuid.UUID
     webpage_id: uuid.UUID
     url: str
     requested_at: datetime
@@ -83,6 +85,34 @@ class FetchOutput(BaseModel):
     http_status: int | None
     reason: str | None
     snapshot: SnapshotSummary | None
+
+
+class SnapshotOutput(BaseModel):
+    """A stored copy of a webpage. Its text is at `GET /snapshots/{id}/text/{page}` once
+    `text_status` is `ready`, and its bytes at `GET /snapshots/{id}/bytes`."""
+
+    id: uuid.UUID
+    webpage_id: uuid.UUID
+    url: str
+    content_hash: str
+    media_type: str
+    size_bytes: int
+    text_status: TextStatus
+    text_error: str | None
+    parser: str | None
+    stated_date: datetime | None
+    created_at: datetime
+
+
+class WebpageOutput(BaseModel):
+    """A URL the crawler has seen, with every fetch of it (newest first) and its snapshots."""
+
+    id: uuid.UUID
+    url: str
+    domain: str
+    missing_since: datetime | None
+    fetches: list[FetchOutput]
+    snapshots: list[SnapshotOutput]
 
 
 class OutcomeCount(BaseModel):

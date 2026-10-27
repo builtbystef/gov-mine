@@ -10,8 +10,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from gov_mine.db.base import utcnow
 from gov_mine.modules.classify.models import Classification, Document
 from gov_mine.modules.crawl import service as crawl
-from gov_mine.modules.crawl.models import CrawlRun, Fetch, FetchOutcome, RunStatus, Webpage
+from gov_mine.modules.crawl.models import (
+    CrawlRun,
+    Domain,
+    Fetch,
+    FetchOutcome,
+    RunStatus,
+    Webpage,
+)
 from gov_mine.modules.extract import service as extract
+from gov_mine.modules.ingest import service as ingest
 from gov_mine.modules.ingest.models import TextStatus, WebpageSnapshot
 from gov_mine.modules.institutions import service as institutions
 from gov_mine.modules.institutions.models import Institution
@@ -29,9 +37,11 @@ from gov_mine.modules.runs.schemas import (
     RunReport,
     RunSettings,
     RunTrigger,
+    SnapshotOutput,
     SnapshotSummary,
+    WebpageOutput,
 )
-from gov_mine.shared.exceptions import ConflictError
+from gov_mine.shared.exceptions import ConflictError, NotFoundError
 
 ACTIVE_STATUSES = (RunStatus.QUEUED, RunStatus.RUNNING)
 
@@ -179,15 +189,55 @@ async def read_run(session: AsyncSession, run_id: uuid.UUID) -> RunOutput:
     return _run_output(run, institution.name, counts[run.id])
 
 
-async def list_fetches(
-    session: AsyncSession, run_id: uuid.UUID, *, limit: int, offset: int
+def _snapshot_summary(snapshot: WebpageSnapshot | None) -> SnapshotSummary | None:
+    if snapshot is None:
+        return None
+    return SnapshotSummary(
+        id=snapshot.id,
+        content_hash=snapshot.content_hash,
+        media_type=snapshot.media_type,
+        size_bytes=snapshot.size_bytes,
+    )
+
+
+def _fetch_output(fetch: Fetch, url: str, snapshot: WebpageSnapshot | None) -> FetchOutput:
+    return FetchOutput(
+        id=fetch.id,
+        crawl_run_id=fetch.crawl_run_id,
+        webpage_id=fetch.webpage_id,
+        url=url,
+        requested_at=fetch.requested_at,
+        duration_ms=fetch.duration_ms,
+        outcome=fetch.outcome,
+        http_status=fetch.http_status,
+        reason=fetch.reason,
+        snapshot=_snapshot_summary(snapshot),
+    )
+
+
+async def list_fetches(  # noqa: PLR0913 - the page and its two filters, as keywords
+    session: AsyncSession,
+    run_id: uuid.UUID,
+    *,
+    limit: int,
+    offset: int,
+    outcome: FetchOutcome | None = None,
+    q: str | None = None,
 ) -> tuple[list[FetchOutput], int]:
-    """The run's fetch log in the order the requests were made. Raises `NotFoundError` for an
-    unknown run."""
+    """The run's fetch log in the order the requests were made, of one `outcome` and with `q` in
+    the URL when given. Raises `NotFoundError` for an unknown run."""
     await crawl.get_run(session, run_id)
+    where = [Fetch.crawl_run_id == run_id]
+    if outcome is not None:
+        where.append(Fetch.outcome == outcome)
+    if q:
+        where.append(Webpage.url.icontains(q, autoescape=True))
     total = (
         await session.scalar(
-            select(func.count()).select_from(Fetch).where(Fetch.crawl_run_id == run_id)
+            select(func.count())
+            .select_from(Fetch)
+            .join(Webpage, Webpage.id == Fetch.webpage_id)
+            .where(*where)
         )
         or 0
     )
@@ -195,33 +245,85 @@ async def list_fetches(
         select(Fetch, Webpage.url, WebpageSnapshot)
         .join(Webpage, Webpage.id == Fetch.webpage_id)
         .outerjoin(WebpageSnapshot, WebpageSnapshot.id == Fetch.snapshot_id)
-        .where(Fetch.crawl_run_id == run_id)
+        .where(*where)
         .order_by(Fetch.requested_at, Fetch.id)
         .limit(limit)
         .offset(offset)
     )
-    items = [
-        FetchOutput(
-            id=fetch.id,
-            webpage_id=fetch.webpage_id,
-            url=url,
-            requested_at=fetch.requested_at,
-            duration_ms=fetch.duration_ms,
-            outcome=fetch.outcome,
-            http_status=fetch.http_status,
-            reason=fetch.reason,
-            snapshot=None
-            if snapshot is None
-            else SnapshotSummary(
-                id=snapshot.id,
-                content_hash=snapshot.content_hash,
-                media_type=snapshot.media_type,
-                size_bytes=snapshot.size_bytes,
-            ),
-        )
-        for fetch, url, snapshot in rows
-    ]
-    return items, total
+    return [_fetch_output(fetch, url, snapshot) for fetch, url, snapshot in rows], total
+
+
+def _snapshot_output(snapshot: WebpageSnapshot, url: str) -> SnapshotOutput:
+    return SnapshotOutput(
+        id=snapshot.id,
+        webpage_id=snapshot.webpage_id,
+        url=url,
+        content_hash=snapshot.content_hash,
+        media_type=snapshot.media_type,
+        size_bytes=snapshot.size_bytes,
+        text_status=snapshot.text_status,
+        text_error=snapshot.text_error,
+        parser=snapshot.parser,
+        stated_date=snapshot.stated_date,
+        created_at=snapshot.created_at,
+    )
+
+
+async def list_snapshots(
+    session: AsyncSession, run_id: uuid.UUID, *, limit: int, offset: int
+) -> tuple[list[SnapshotOutput], int]:
+    """The snapshots the run's fetches wrote, in the order they were written. Raises
+    `NotFoundError` for an unknown run."""
+    await crawl.get_run(session, run_id)
+    written = select(Fetch.snapshot_id).where(
+        Fetch.crawl_run_id == run_id, Fetch.snapshot_id.is_not(None)
+    )
+    where = WebpageSnapshot.id.in_(written)
+    total = await session.scalar(select(func.count()).select_from(WebpageSnapshot).where(where))
+    rows = await session.execute(
+        select(WebpageSnapshot, Webpage.url)
+        .join(Webpage, Webpage.id == WebpageSnapshot.webpage_id)
+        .where(where)
+        .order_by(WebpageSnapshot.created_at, WebpageSnapshot.id)
+        .limit(limit)
+        .offset(offset)
+    )
+    return [_snapshot_output(snapshot, url) for snapshot, url in rows], total or 0
+
+
+async def read_snapshot(session: AsyncSession, snapshot_id: uuid.UUID) -> SnapshotOutput:
+    """Raises `NotFoundError` for an unknown snapshot."""
+    snapshot = await ingest.get_snapshot(session, snapshot_id)
+    webpage = await session.get_one(Webpage, snapshot.webpage_id)
+    return _snapshot_output(snapshot, webpage.url)
+
+
+async def read_webpage(session: AsyncSession, webpage_id: uuid.UUID) -> WebpageOutput:
+    """A webpage with every fetch of it, newest first, and its snapshots. Raises `NotFoundError`
+    for an unknown webpage."""
+    webpage = await session.get(Webpage, webpage_id)
+    if webpage is None:
+        raise NotFoundError(f"Webpage {webpage_id} not found")
+    domain = await session.get_one(Domain, webpage.domain_id)
+    fetches = await session.execute(
+        select(Fetch, WebpageSnapshot)
+        .outerjoin(WebpageSnapshot, WebpageSnapshot.id == Fetch.snapshot_id)
+        .where(Fetch.webpage_id == webpage_id)
+        .order_by(Fetch.requested_at.desc(), Fetch.id.desc())
+    )
+    snapshots = await session.scalars(
+        select(WebpageSnapshot)
+        .where(WebpageSnapshot.webpage_id == webpage_id)
+        .order_by(WebpageSnapshot.created_at.desc(), WebpageSnapshot.id.desc())
+    )
+    return WebpageOutput(
+        id=webpage.id,
+        url=webpage.url,
+        domain=domain.name,
+        missing_since=webpage.missing_since,
+        fetches=[_fetch_output(fetch, webpage.url, snapshot) for fetch, snapshot in fetches],
+        snapshots=[_snapshot_output(snapshot, webpage.url) for snapshot in snapshots],
+    )
 
 
 async def _records(_session: AsyncSession, _run_id: uuid.UUID) -> RecordCounts | None:

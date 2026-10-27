@@ -6,6 +6,7 @@ from gov_mine.modules.ingest.router import router as ingest_router
 from gov_mine.modules.institutions.router import router as institutions_router
 from gov_mine.modules.ledger.router import router as ledger_router
 from gov_mine.modules.runs.router import router as runs_router
+from gov_mine.modules.runs.router import snapshots_router, webpages_router
 
 router = APIRouter()
 router.include_router(health_router)
@@ -14,3 +15,5 @@ router.include_router(runs_router)
 router.include_router(ingest_router)
 router.include_router(classify_router)
 router.include_router(ledger_router)
+router.include_router(snapshots_router)
+router.include_router(webpages_router)

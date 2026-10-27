@@ -26,6 +26,10 @@ export function titleFor(pathname: string): string | null {
           : "Institution";
     case "runs":
       return id === undefined ? "Runs" : "Run";
+    case "snapshots":
+      return "Snapshot";
+    case "webpages":
+      return "Webpage";
     default:
       return null;
   }

@@ -176,9 +176,30 @@ export interface paths {
         };
         /**
          * List Fetches
-         * @description The run's fetch log, one row per attempt, in the order the requests were made.
+         * @description The run's fetch log, one row per attempt, in the order the requests were made: only those
+         *     with `outcome`, and only URLs containing `q` (any case), when given.
          */
         get: operations["runs-list_fetches"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runs/{run_id}/snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Snapshots
+         * @description The snapshots the run wrote, in the order it wrote them.
+         */
+        get: operations["runs-list_snapshots"];
         put?: never;
         post?: never;
         delete?: never;
@@ -268,6 +289,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/runs/{run_id}/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Run Documents
+         * @description The documents the run created or gave a new version, by type then title.
+         */
+        get: operations["runs-list_run_documents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ai-calls": {
         parameters: {
             query?: never;
@@ -280,6 +321,44 @@ export interface paths {
          * @description The run's paid calls, by purpose, oldest first within each.
          */
         get: operations["ai-calls-list_ai_calls"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/snapshots/{snapshot_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Snapshot */
+        get: operations["snapshots-read_snapshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/webpages/{webpage_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Webpage
+         * @description The webpage, its domain, `missing_since`, every fetch of it newest first, and its
+         *     snapshots newest first.
+         */
+        get: operations["webpages-read_webpage"];
         put?: never;
         post?: never;
         delete?: never;
@@ -352,6 +431,34 @@ export interface components {
          */
         AIPurpose: "classify" | "extract" | "ocr" | "transcribe";
         /**
+         * DocumentOutput
+         * @description A document a run's classifications found.
+         */
+        DocumentOutput: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Webpage Id
+             * Format: uuid
+             */
+            webpage_id: string;
+            /** Url */
+            url: string;
+            document_type: components["schemas"]["DocumentType"];
+            /** Title */
+            title: string | null;
+            /** Document Date */
+            document_date: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
          * DocumentType
          * @description What a source lists and what a document is. A `project_material` is assigned by a
          *     project's extraction, never by the classifier.
@@ -379,6 +486,11 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Crawl Run Id
+             * Format: uuid
+             */
+            crawl_run_id: string;
             /**
              * Webpage Id
              * Format: uuid
@@ -500,6 +612,17 @@ export interface components {
             /** Offset */
             offset: number;
         };
+        /** Page[DocumentOutput] */
+        Page_DocumentOutput_: {
+            /** Items */
+            items: components["schemas"]["DocumentOutput"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
         /** Page[FetchOutput] */
         Page_FetchOutput_: {
             /** Items */
@@ -526,6 +649,17 @@ export interface components {
         Page_RunOutput_: {
             /** Items */
             items: components["schemas"]["RunOutput"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[SnapshotOutput] */
+        Page_SnapshotOutput_: {
+            /** Items */
+            items: components["schemas"]["SnapshotOutput"][];
             /** Total */
             total: number;
             /** Limit */
@@ -754,6 +888,43 @@ export interface components {
          * @enum {string}
          */
         RunStatus: "queued" | "running" | "finished" | "failed" | "cancelled";
+        /**
+         * SnapshotOutput
+         * @description A stored copy of a webpage. Its text is at `GET /snapshots/{id}/text/{page}` once
+         *     `text_status` is `ready`, and its bytes at `GET /snapshots/{id}/bytes`.
+         */
+        SnapshotOutput: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Webpage Id
+             * Format: uuid
+             */
+            webpage_id: string;
+            /** Url */
+            url: string;
+            /** Content Hash */
+            content_hash: string;
+            /** Media Type */
+            media_type: string;
+            /** Size Bytes */
+            size_bytes: number;
+            text_status: components["schemas"]["TextStatus"];
+            /** Text Error */
+            text_error: string | null;
+            /** Parser */
+            parser: string | null;
+            /** Stated Date */
+            stated_date: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** SnapshotSummary */
         SnapshotSummary: {
             /**
@@ -797,6 +968,11 @@ export interface components {
              */
             next_crawl_at: string;
         };
+        /**
+         * TextStatus
+         * @enum {string}
+         */
+        TextStatus: "parsing" | "ready" | "partial" | "failed" | "none";
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -810,6 +986,27 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /**
+         * WebpageOutput
+         * @description A URL the crawler has seen, with every fetch of it (newest first) and its snapshots.
+         */
+        WebpageOutput: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Url */
+            url: string;
+            /** Domain */
+            domain: string;
+            /** Missing Since */
+            missing_since: string | null;
+            /** Fetches */
+            fetches: components["schemas"]["FetchOutput"][];
+            /** Snapshots */
+            snapshots: components["schemas"]["SnapshotOutput"][];
+        };
     };
     responses: never;
     parameters: never;
@@ -819,6 +1016,7 @@ export interface components {
 }
 export type AiCallOutput = components['schemas']['AICallOutput'];
 export type AiPurpose = components['schemas']['AIPurpose'];
+export type DocumentOutput = components['schemas']['DocumentOutput'];
 export type DocumentType = components['schemas']['DocumentType'];
 export type DocumentTypeCount = components['schemas']['DocumentTypeCount'];
 export type FetchOutcome = components['schemas']['FetchOutcome'];
@@ -831,9 +1029,11 @@ export type InstitutionType = components['schemas']['InstitutionType'];
 export type LastRun = components['schemas']['LastRun'];
 export type OutcomeCount = components['schemas']['OutcomeCount'];
 export type PageAiCallOutput = components['schemas']['Page_AICallOutput_'];
+export type PageDocumentOutput = components['schemas']['Page_DocumentOutput_'];
 export type PageFetchOutput = components['schemas']['Page_FetchOutput_'];
 export type PageInstitutionOutput = components['schemas']['Page_InstitutionOutput_'];
 export type PageRunOutput = components['schemas']['Page_RunOutput_'];
+export type PageSnapshotOutput = components['schemas']['Page_SnapshotOutput_'];
 export type PageSourceOutput = components['schemas']['Page_SourceOutput_'];
 export type ProviderCost = components['schemas']['ProviderCost'];
 export type PurposeCalls = components['schemas']['PurposeCalls'];
@@ -845,9 +1045,12 @@ export type RunOutput = components['schemas']['RunOutput'];
 export type RunReport = components['schemas']['RunReport'];
 export type RunSettings = components['schemas']['RunSettings'];
 export type RunStatus = components['schemas']['RunStatus'];
+export type SnapshotOutput = components['schemas']['SnapshotOutput'];
 export type SnapshotSummary = components['schemas']['SnapshotSummary'];
 export type SourceOutput = components['schemas']['SourceOutput'];
+export type TextStatus = components['schemas']['TextStatus'];
 export type ValidationError = components['schemas']['ValidationError'];
+export type WebpageOutput = components['schemas']['WebpageOutput'];
 export type $defs = Record<string, never>;
 export interface operations {
     "health-read_health": {
@@ -1173,6 +1376,8 @@ export interface operations {
             query?: {
                 limit?: number;
                 offset?: number;
+                outcome?: components["schemas"]["FetchOutcome"] | null;
+                q?: string | null;
             };
             header?: never;
             path: {
@@ -1189,6 +1394,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_FetchOutput_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    "runs-list_snapshots": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_SnapshotOutput_"];
                 };
             };
             /** @description Validation Error */
@@ -1330,6 +1569,40 @@ export interface operations {
             };
         };
     };
+    "runs-list_run_documents": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_DocumentOutput_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     "ai-calls-list_ai_calls": {
         parameters: {
             query: {
@@ -1350,6 +1623,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_AICallOutput_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    "snapshots-read_snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                snapshot_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotOutput"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    "webpages-read_webpage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                webpage_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebpageOutput"];
                 };
             };
             /** @description Validation Error */

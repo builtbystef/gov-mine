@@ -453,8 +453,108 @@
           "runs"
         ],
         "summary": "List Fetches",
-        "description": "The run's fetch log, one row per attempt, in the order the requests were made.",
+        "description": "The run's fetch log, one row per attempt, in the order the requests were made: only those\nwith `outcome`, and only URLs containing `q` (any case), when given.",
         "operationId": "runs-list_fetches",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/FetchOutcome"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outcome"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_FetchOutput_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{run_id}/snapshots": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "List Snapshots",
+        "description": "The snapshots the run wrote, in the order it wrote them.",
+        "operationId": "runs-list_snapshots",
         "parameters": [
           {
             "name": "run_id",
@@ -496,7 +596,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_FetchOutput_"
+                  "$ref": "#/components/schemas/Page_SnapshotOutput_"
                 }
               }
             }
@@ -719,6 +819,73 @@
         }
       }
     },
+    "/runs/{run_id}/documents": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "List Run Documents",
+        "description": "The documents the run created or gave a new version, by type then title.",
+        "operationId": "runs-list_run_documents",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_DocumentOutput_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ai-calls": {
       "get": {
         "tags": [
@@ -769,6 +936,93 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Page_AICallOutput_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/snapshots/{snapshot_id}": {
+      "get": {
+        "tags": [
+          "snapshots"
+        ],
+        "summary": "Read Snapshot",
+        "operationId": "snapshots-read_snapshot",
+        "parameters": [
+          {
+            "name": "snapshot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Snapshot Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotOutput"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webpages/{webpage_id}": {
+      "get": {
+        "tags": [
+          "webpages"
+        ],
+        "summary": "Read Webpage",
+        "description": "The webpage, its domain, `missing_since`, every fetch of it newest first, and its\nsnapshots newest first.",
+        "operationId": "webpages-read_webpage",
+        "parameters": [
+          {
+            "name": "webpage_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Webpage Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebpageOutput"
                 }
               }
             }
@@ -927,6 +1181,67 @@
         ],
         "title": "AIPurpose"
       },
+      "DocumentOutput": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "webpage_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Webpage Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "document_type": {
+            "$ref": "#/components/schemas/DocumentType"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "document_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Date"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "webpage_id",
+          "url",
+          "document_type",
+          "title",
+          "document_date",
+          "created_at"
+        ],
+        "title": "DocumentOutput",
+        "description": "A document a run's classifications found."
+      },
       "DocumentType": {
         "type": "string",
         "enum": [
@@ -986,6 +1301,11 @@
             "type": "string",
             "format": "uuid",
             "title": "Id"
+          },
+          "crawl_run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Crawl Run Id"
           },
           "webpage_id": {
             "type": "string",
@@ -1051,6 +1371,7 @@
         "type": "object",
         "required": [
           "id",
+          "crawl_run_id",
           "webpage_id",
           "url",
           "requested_at",
@@ -1347,6 +1668,37 @@
         ],
         "title": "Page[AICallOutput]"
       },
+      "Page_DocumentOutput_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentOutput"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[DocumentOutput]"
+      },
       "Page_FetchOutput_": {
         "properties": {
           "items": {
@@ -1439,6 +1791,37 @@
           "offset"
         ],
         "title": "Page[RunOutput]"
+      },
+      "Page_SnapshotOutput_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SnapshotOutput"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[SnapshotOutput]"
       },
       "Page_SourceOutput_": {
         "properties": {
@@ -2016,6 +2399,94 @@
         ],
         "title": "RunStatus"
       },
+      "SnapshotOutput": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "webpage_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Webpage Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          },
+          "media_type": {
+            "type": "string",
+            "title": "Media Type"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "text_status": {
+            "$ref": "#/components/schemas/TextStatus"
+          },
+          "text_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Error"
+          },
+          "parser": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parser"
+          },
+          "stated_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stated Date"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "webpage_id",
+          "url",
+          "content_hash",
+          "media_type",
+          "size_bytes",
+          "text_status",
+          "text_error",
+          "parser",
+          "stated_date",
+          "created_at"
+        ],
+        "title": "SnapshotOutput",
+        "description": "A stored copy of a webpage. Its text is at `GET /snapshots/{id}/text/{page}` once\n`text_status` is `ready`, and its bytes at `GET /snapshots/{id}/bytes`."
+      },
       "SnapshotSummary": {
         "properties": {
           "id": {
@@ -2087,6 +2558,17 @@
         "title": "SourceOutput",
         "description": "A listing page the run found, revisited every `crawl_interval`."
       },
+      "TextStatus": {
+        "type": "string",
+        "enum": [
+          "parsing",
+          "ready",
+          "partial",
+          "failed",
+          "none"
+        ],
+        "title": "TextStatus"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -2126,6 +2608,60 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "WebpageOutput": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "domain": {
+            "type": "string",
+            "title": "Domain"
+          },
+          "missing_since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missing Since"
+          },
+          "fetches": {
+            "items": {
+              "$ref": "#/components/schemas/FetchOutput"
+            },
+            "type": "array",
+            "title": "Fetches"
+          },
+          "snapshots": {
+            "items": {
+              "$ref": "#/components/schemas/SnapshotOutput"
+            },
+            "type": "array",
+            "title": "Snapshots"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "url",
+          "domain",
+          "missing_since",
+          "fetches",
+          "snapshots"
+        ],
+        "title": "WebpageOutput",
+        "description": "A URL the crawler has seen, with every fetch of it (newest first) and its snapshots."
       }
     }
   }

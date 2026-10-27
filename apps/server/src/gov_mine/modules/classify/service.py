@@ -413,6 +413,28 @@ async def count_run_documents(session: AsyncSession, run_id: uuid.UUID) -> dict[
     return {row[0]: row[1] for row in rows}
 
 
+async def list_run_documents(
+    session: AsyncSession, run_id: uuid.UUID, *, limit: int, offset: int
+) -> tuple[list[tuple[Document, str]], int]:
+    """The documents the run created (their webpage was classified in it) or gave a new version
+    (a snapshot written in it), with their webpage's URL, by type then title."""
+    await crawl.get_run(session, run_id)
+    written = select(Fetch.webpage_id).where(
+        Fetch.crawl_run_id == run_id, Fetch.snapshot_id.is_not(None)
+    )
+    found = Document.webpage_id.in_(_found_in(run_id)) | Document.webpage_id.in_(written)
+    total = await session.scalar(select(func.count()).select_from(Document).where(found)) or 0
+    rows = await session.execute(
+        select(Document, Webpage.url)
+        .join(Webpage, Webpage.id == Document.webpage_id)
+        .where(found)
+        .order_by(Document.document_type, Document.title, Document.id)
+        .limit(limit)
+        .offset(offset)
+    )
+    return [(document, url) for document, url in rows.tuples()], total
+
+
 __all__ = [
     "CLASSIFIER",
     "CLASSIFY_TASK",
@@ -422,6 +444,7 @@ __all__ = [
     "count_run_documents",
     "crawl_interval",
     "criteria",
+    "list_run_documents",
     "list_run_sources",
     "queue_page",
     "read_html",

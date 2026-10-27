@@ -31,6 +31,10 @@ function outcomeVariant(outcome: FetchOutcome): Variant {
   return "outline";
 }
 
+export function outcomeLabel(outcome: FetchOutcome): string {
+  return label(outcome);
+}
+
 export function FetchOutcomeBadge({ outcome }: { outcome: FetchOutcome }) {
   return <Badge variant={outcomeVariant(outcome)}>{label(outcome)}</Badge>;
 }
