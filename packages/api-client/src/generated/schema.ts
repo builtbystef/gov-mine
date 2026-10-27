@@ -746,6 +746,8 @@ export interface components {
             extractors?: {
                 [key: string]: string;
             } | null;
+            /** Replay */
+            replay?: string | null;
         };
         /**
          * RunStatus

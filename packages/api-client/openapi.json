@@ -1984,6 +1984,17 @@
               }
             ],
             "title": "Extractors"
+          },
+          "replay": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replay"
           }
         },
         "type": "object",
