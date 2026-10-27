@@ -38,6 +38,7 @@ Make the ticket's behavior work, correctly and completely, and nothing beyond it
 
 - For a refactor ticket, pin the behavior first: tests that cover what the code does today must exist and pass before you move anything, and pass unmodified after.
 - Exercise each criterion for real: call the endpoint, run the function from a scratch script, load the page. A passing typecheck is not evidence the behavior works. Delete scratch code afterwards.
+- Check off each criterion in the ticket as soon as you have verified it: `- [ ]` to `- [x]` in the backlog file, or in the issue body with `gh issue edit`. A criterion you couldn't verify stays unchecked. The ticket file's edits go in the ticket's commit.
 - Read every comment and docstring your diff adds (`git diff`) and delete each one that fails the rule above. Writing them is a habit, so this pass is where they get caught.
 - `vp run check` passes. Run the tests near your change while you work (`uv run pytest <path>`, `vp test <path>`), then the full `vp run test` once at the end. Integration tests need `vp run db:up`.
 - New tests are /test-ticket's job. When an existing test fails, work out whether the code or the test is wrong. Change a test only when the ticket deliberately changes that behavior. Deleting, skipping, or loosening a test, or adding a lint or type ignore, to get green is never the fix.
