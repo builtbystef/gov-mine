@@ -13,12 +13,59 @@ design is in [docs/specification/](docs/specification/README.md).
 | Type check | tsc (`vp check`)                              | [ty](https://docs.astral.sh/ty) |
 | Tests      | Vitest (`vp test`)                            | pytest                          |
 
-## Requirements
+## Running it
 
-- Node ≥ 24, Python ≥ 3.14 (uv downloads it), uv ≥ 0.12
-- Docker with Compose, for the local PostgreSQL and RustFS
+There are two ways to run gov-mine. Both use the PostgreSQL and RustFS
+containers from `apps/server/compose.yaml`.
 
-## Commands
+|              | Use the app                                       | Develop the app                                         |
+| ------------ | ------------------------------------------------- | ------------------------------------------------------- |
+| Command      | `docker compose --profile app`                    | `vp`                                                    |
+| What runs    | API, worker and dashboard from the release images | The same processes on your machine, reloading on change |
+| Needs        | Docker with Compose                               | Docker, Node ≥ 24, uv ≥ 0.12 (it downloads Python 3.14) |
+| Code changes | Rebuild with `--build`                            | Picked up as you save                                   |
+
+Run one or the other, not both at once: they use the same ports (8000, 3000),
+and two workers would take jobs from the same queue.
+
+### Use the app (Docker)
+
+```sh
+cd apps/server
+# The OpenRouter key for the model steps. Without it, nothing calls a model.
+echo 'GOV_MINE_OPENROUTER_API_KEY=sk-or-...' >> .env
+docker compose --profile app up --build --detach
+
+docker compose exec api gov-mine seed                       # prints CreateTO's institution id
+docker compose exec api gov-mine run create <id> --full     # queue a run; --limit 20 for a short one
+docker compose --profile app logs --follow worker           # watch it crawl
+```
+
+- Dashboard: http://localhost:3000
+- API docs: http://localhost:8000/docs
+- Storage console: http://localhost:9001 (`rustfsadmin` / `rustfsadmin`)
+
+`docker compose --profile app down` stops everything and keeps the data in
+volumes. Add `--volumes` to delete the data too. The containers use the
+default settings from `apps/server/.env.example`, apart from the addresses set
+in `compose.yaml`.
+
+### Develop the app (vp)
+
+```sh
+vp install && uv sync   # Node and Python dependencies
+vp config               # once: activates the pre-commit hook
+vp run db:up            # PostgreSQL and RustFS only
+vp run db:migrate
+vp run dev              # API on :8000, worker, dashboard on :3000, all reloading
+
+cd apps/server && uv run gov-mine seed   # the CLI, against the same database
+```
+
+Settings come from `apps/server/.env`. Every line in `.env.example` is also
+the default, so with no `.env` at all the app runs locally.
+
+### Commands
 
 ```sh
 vp run check         # format + lint + typecheck, both languages (check:fix to apply fixes)
@@ -31,8 +78,6 @@ vp run dev           # API, worker, and web together
 vp run dev:api       # http://127.0.0.1:8000/docs
 vp run dev:web       # http://localhost:3000
 ```
-
-Run `vp config` once after cloning to activate the pre-commit hook.
 
 ## Layout
 
@@ -72,7 +117,7 @@ from `/app/apps/server` before new code starts. Health checks: `/health/`
 GOV_MINE_DATABASE_URL=postgresql+psycopg://...
 GOV_MINE_STORAGE_ENDPOINT_URL=... GOV_MINE_STORAGE_BUCKET=... GOV_MINE_STORAGE_ACCESS_KEY=... GOV_MINE_STORAGE_SECRET_KEY=...
 GOV_MINE_STORAGE_PATH_STYLE=false   # true for MinIO and RustFS
-GOV_MINE_OPENAI_API_KEY=...         # optional; unset, nothing calls the model
+GOV_MINE_OPENROUTER_API_KEY=...     # optional; unset, nothing calls a model
 API_URL=http://api.internal:8000    # web only
 ```
 

@@ -1,6 +1,28 @@
 # Local PostgreSQL and RustFS for apps/server: `vp run db:up`. Credentials match
 # the default settings in src/gov_mine/config.py and the CI services.
+#
+# The `app` profile also runs the app itself from its images (API, worker,
+# dashboard), for using it rather than developing it:
+#
+#   docker compose --profile app up --build --detach
 name: gov-mine
+
+# The API, the worker and the one-off migration share the server image and
+# reach PostgreSQL and storage by service name. Compose reads the OpenRouter
+# key from apps/server/.env when it is set there.
+x-server: &server
+  profiles: [app]
+  build:
+    context: ../..
+    dockerfile: apps/server/Dockerfile
+  image: gov-mine-server
+  restart: unless-stopped
+  environment:
+    GOV_MINE_DATABASE_URL: postgresql+psycopg://gov_mine:gov_mine@db:5432/gov_mine
+    GOV_MINE_STORAGE_ENDPOINT_URL: http://storage:9000
+    # Presigned URLs are opened by the browser, outside Docker.
+    GOV_MINE_STORAGE_PUBLIC_ENDPOINT_URL: http://localhost:9000
+    GOV_MINE_OPENROUTER_API_KEY: ${GOV_MINE_OPENROUTER_API_KEY:-}
 
 services:
   db:
@@ -74,6 +96,49 @@ services:
             "MaxAgeSeconds": 3000
           }]
         }'
+
+  # --- The app (`--profile app`) -------------------------------------------
+
+  migrate:
+    <<: *server
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *server
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      storage-init:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  worker:
+    <<: *server
+    command: ["gov-mine", "worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      storage-init:
+        condition: service_completed_successfully
+
+  web:
+    profiles: [app]
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+    image: gov-mine-web
+    restart: unless-stopped
+    environment:
+      API_URL: http://api:8000
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:3000:3000"
 
 volumes:
   db-data:
