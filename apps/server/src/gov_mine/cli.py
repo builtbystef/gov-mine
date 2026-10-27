@@ -5,6 +5,7 @@ environment."""
 import asyncio
 import uuid
 from collections.abc import Awaitable, Callable
+from datetime import date, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -15,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from gov_mine.config import Settings
 from gov_mine.integrations.http.replay import replay_address, replay_app
 from gov_mine.jobs import worker as jobs_worker
+from gov_mine.modules.export import service as exports
 from gov_mine.modules.institutions import service as institutions
 from gov_mine.modules.runs import service as runs
 from gov_mine.resources import build_resources
@@ -143,3 +145,25 @@ def run_report(
     """Print a run's numbers as markdown tables, each a query over its logs."""
     report = _run(lambda session: runs.report(session, run_id))
     typer.echo(report.model_dump_json(indent=2) if as_json else runs.report_markdown(report))
+
+
+@app.command("export")
+def export(
+    out: Annotated[
+        Path, typer.Option("--out", file_okay=False, help="The folder to write the files into.")
+    ],
+    since: Annotated[
+        datetime | None,
+        typer.Option(
+            formats=["%Y-%m-%d"],
+            show_default="today minus five years",
+            help="Leave out documents dated before this day, and their records.",
+        ),
+    ] = None,
+) -> None:
+    """Write the records as JSON Lines, one file per record type, with documents.jsonl,
+    citations.jsonl and manifest.json."""
+    cutoff: date | None = None if since is None else since.date()
+    manifest = _run(lambda session: exports.export(session, out, since=cutoff))
+    for name, count in manifest["files"].items():
+        typer.echo(f"{count:>6}  {out / name}")

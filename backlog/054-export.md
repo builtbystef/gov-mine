@@ -9,9 +9,9 @@ Depends on: 028
 
 ## Acceptance criteria
 
-- [ ] The output directory holds `projects.jsonl`, `news_items.jsonl`, `meetings.jsonl`, `contacts.jsonl`, `rfps.jsonl`, `grants.jsonl`, `contracts.jsonl`, `documents.jsonl`, `citations.jsonl` and `manifest.json`.
-- [ ] Each record line has `id`, `institution`, `document` (its URL), `key`, the typed fields, `citations` (`field`, `url`, `page`, `excerpt`, `verified`), `first_seen_at` and `last_changed_at`.
-- [ ] Each document line has `id`, `institution`, `url`, `document_type`, `title`, `document_date`, `parent` (the parent's URL) and `first_seen_at`.
-- [ ] Without `--since`, documents dated before today minus five years, and their records, are left out; undated documents are kept. `--since 2024-01-01` moves the cutoff.
-- [ ] `manifest.json` gives the export time, the cutoff, the latest finished run of each exported institution, the extractor versions and each file's line count.
-- [ ] Exporting twice from the same database gives the same lines.
+- [x] The output directory holds `projects.jsonl`, `news_items.jsonl`, `meetings.jsonl`, `contacts.jsonl`, `rfps.jsonl`, `grants.jsonl`, `contracts.jsonl`, `documents.jsonl`, `citations.jsonl` and `manifest.json`.
+- [x] Each record line has `id`, `institution`, `document` (its URL), `key`, the typed fields, `citations` (`field`, `url`, `page`, `excerpt`, `verified`), `first_seen_at` and `last_changed_at`.
+- [x] Each document line has `id`, `institution`, `url`, `document_type`, `title`, `document_date`, `parent` (the parent's URL) and `first_seen_at`.
+- [x] Without `--since`, documents dated before today minus five years, and their records, are left out; undated documents are kept. `--since 2024-01-01` moves the cutoff.
+- [x] `manifest.json` gives the export time, the cutoff, the latest finished run of each exported institution, the extractor versions and each file's line count.
+- [x] Exporting twice from the same database gives the same lines.

@@ -4,8 +4,10 @@ and key; a record snapshot is written only when its data changed, with a citatio
 checked against the cited page."""
 
 import logging
+import re
 import uuid
-from datetime import UTC, datetime, time
+from collections.abc import Iterable
+from datetime import UTC, date, datetime, time
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ValidationError
@@ -70,6 +72,33 @@ word for word from that page that states it. Leave a field null when the documen
 state it; never guess. Dates are YYYY-MM-DD: a month or a year alone is its first day. Also give
 the date the document itself was published, announced or issued, when it states one.
 """
+
+
+# The five-year window (section 3): documents dated before a run's start minus this many years
+# are kept and not extracted.
+WINDOW_YEARS = 5
+_ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
+def window_cutoff(day: date) -> date:
+    """`day` minus five years; 29 February becomes the 28th."""
+    try:
+        return day.replace(year=day.year - WINDOW_YEARS)
+    except ValueError:
+        return day.replace(year=day.year - WINDOW_YEARS, day=28)
+
+
+def latest_date(document_date: datetime | None, records: Iterable[dict[str, Any]]) -> date | None:
+    """The latest date a document states about itself: its `document_date` or any ISO date
+    field of its records' current data. None when it states none."""
+    dates = [document_date.date()] if document_date is not None else []
+    for data in records:
+        dates += [
+            date.fromisoformat(value)
+            for value in data.values()
+            if isinstance(value, str) and _ISO_DATE.fullmatch(value)
+        ]
+    return max(dates, default=None)
 
 
 def extractor_name(record_type: str) -> str:
@@ -365,9 +394,12 @@ __all__ = [
     "EXTRACT_TASK",
     "MAX_TEXT_CHARS",
     "VERSION",
+    "WINDOW_YEARS",
     "extract_document",
     "extractor_name",
     "extractor_versions",
+    "latest_date",
     "list_current_records",
     "queue_document",
+    "window_cutoff",
 ]
