@@ -1,6 +1,6 @@
 """The crawl: starting a run from the homepage and the sitemap, fetching a page into the fetch
-log and queueing the links it holds one link deeper, and finishing the run when its jobs are
-done. The jobs in jobs.py call these, one transaction each."""
+log (once its host's robots.txt allows it) and queueing the links it holds one link deeper, and
+finishing the run when its jobs are done. The jobs in jobs.py call these, one transaction each."""
 
 import logging
 import time
@@ -15,10 +15,12 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from gov_mine.db.base import utcnow
+from gov_mine.integrations.http import ROBOT_NAME
 from gov_mine.integrations.storage import ObjectStore
 from gov_mine.jobs import registry
 from gov_mine.jobs.tasks import defer
 from gov_mine.modules.crawl.models import (
+    DEFAULT_CRAWL_DELAY_MS,
     CrawlPolicy,
     CrawlRun,
     Domain,
@@ -30,6 +32,7 @@ from gov_mine.modules.crawl.models import (
 from gov_mine.modules.ingest import service as ingest
 from gov_mine.modules.institutions.models import Institution
 from gov_mine.shared.exceptions import NotFoundError
+from gov_mine.shared.robots import robots_allows, robots_crawl_delay, robots_url
 from gov_mine.shared.sitemaps import parse_sitemap
 from gov_mine.shared.urls import find_links, is_within, looks_like_file, normalise_url
 
@@ -89,11 +92,17 @@ def media_type_of(response: httpx.Response) -> str:
 
 async def ensure_domain(session: AsyncSession, name: str, policy: CrawlPolicy) -> Domain:
     """The domain row for host `name`, created with `policy` if there is none. An existing
-    row keeps its policy."""
-    await session.execute(
-        insert(Domain).values(name=name, crawl_policy=policy).on_conflict_do_nothing()
-    )
-    return (await session.scalars(select(Domain).where(Domain.name == name))).one()
+    row keeps its policy. It is looked up before the insert: an insert that conflicts with a
+    row another job is updating (its robots.txt) waits for that job, which may be waiting
+    for this one's run lock."""
+    query = select(Domain).where(Domain.name == name)
+    domain = await session.scalar(query)
+    if domain is None:
+        await session.execute(
+            insert(Domain).values(name=name, crawl_policy=policy).on_conflict_do_nothing()
+        )
+        domain = (await session.scalars(query)).one()
+    return domain
 
 
 async def ensure_webpage(session: AsyncSession, url: str, domain_id: uuid.UUID) -> Webpage:
@@ -214,6 +223,62 @@ def refusal(
     return None
 
 
+async def robots_refusal(
+    session: AsyncSession, http: httpx.AsyncClient, run: CrawlRun, domain: Domain, url: str
+) -> tuple[FetchOutcome, str] | None:
+    """Why the host's robots.txt turns `url` down, or None. The first URL on a host in a run
+    reads its robots.txt into the domain row, under the row's lock, so the other jobs of the
+    run find it there; a robots.txt that could not be read refuses every URL on the host."""
+    if _robots_stale(domain, run):
+        domain = (
+            await session.scalars(
+                select(Domain)
+                .where(Domain.id == domain.id)
+                # Not FOR UPDATE: it would hold back the webpages inserted for this host.
+                .with_for_update(key_share=True)
+                .execution_options(populate_existing=True)
+            )
+        ).one()
+        if _robots_stale(domain, run):
+            await read_robots(http, domain, url)
+    if domain.robots_txt is None:
+        return FetchOutcome.BLOCKED_ROBOTS, "robots_unreachable"
+    if not robots_allows(domain.robots_txt, url, ROBOT_NAME):
+        return FetchOutcome.BLOCKED_ROBOTS, "disallowed"
+    return None
+
+
+def _robots_stale(domain: Domain, run: CrawlRun) -> bool:
+    """Whether the run has not read the host's robots.txt yet."""
+    fetched = domain.robots_fetched_at
+    return fetched is None or (run.started_at is not None and fetched < run.started_at)
+
+
+async def read_robots(http: httpx.AsyncClient, domain: Domain, url: str) -> None:
+    """Read the robots.txt governing `url` into `domain`, following redirects, and set the
+    host's delay from it. A 4xx is no robots.txt: stored as "", every path is allowed. A 5xx
+    or a failed request stores None, which refuses every path until the next run reads it
+    again (RFC 9309, "unreachable")."""
+    location = robots_url(url)
+    try:
+        response = await http.get(location, follow_redirects=True)
+    except httpx.HTTPError as exc:
+        logger.warning("robots.txt %s not read: %s", location, type(exc).__name__)
+        domain.robots_txt = None
+    else:
+        if response.status_code == httpx.codes.OK:
+            domain.robots_txt = response.text
+        elif response.is_client_error:
+            logger.info("robots.txt %s: HTTP %d, all allowed", location, response.status_code)
+            domain.robots_txt = ""
+        else:
+            logger.warning("robots.txt %s not read: HTTP %d", location, response.status_code)
+            domain.robots_txt = None
+    domain.robots_fetched_at = utcnow()
+    delay = robots_crawl_delay(domain.robots_txt or "", ROBOT_NAME)
+    domain.crawl_delay_ms = max(DEFAULT_CRAWL_DELAY_MS, round((delay or 0) * 1000))
+
+
 async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it works with
     session: AsyncSession,
     http: httpx.AsyncClient,
@@ -226,7 +291,8 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
     """Fetch a webpage found `depth` links from a seed and log the attempt as a `fetches` row.
 
     Once the run has sent its `--limit` requests, nothing happens and None is returned. A URL
-    the fence refuses gets its row and no request. Otherwise a 200 hands the body to
+    the fence or the host's robots.txt refuses gets its row and no request; reading robots.txt
+    writes no row and does not count toward `--limit`. Otherwise a 200 hands the body to
     `ingest.store`: `fetched` with the new snapshot, or `unchanged` when the bytes are the ones
     already kept; an HTML page on a `crawl` host then queues its links one link deeper (what a
     `files_only` host serves is never followed, whatever its type). Any other status is
@@ -244,6 +310,8 @@ async def fetch_page(  # noqa: PLR0913 - the job's three arguments and what it w
     domain = await session.get_one(Domain, webpage.domain_id)
     fetch = Fetch(crawl_run_id=run.id, webpage_id=webpage.id, requested_at=utcnow())
     refused = refusal(webpage.url, domain.crawl_policy, institution.website_url, depth)
+    if refused is None:
+        refused = await robots_refusal(session, http, run, domain, webpage.url)
     if refused is not None:
         fetch.outcome, fetch.reason = refused
         session.add(fetch)
@@ -365,7 +433,9 @@ __all__ = [
     "media_type_of",
     "queue",
     "queue_links",
+    "read_robots",
     "read_sitemap",
     "refusal",
+    "robots_refusal",
     "start_run",
 ]

@@ -23,6 +23,8 @@ dependencies = [
   # The job queue, on PostgreSQL. A bump may need a migration: see Adding things in apps/server/README.md.
   "procrastinate>=3.9,<4",
   "psycopg[binary]>=3.3.5,<4",
+  # robots.txt rules, with wildcards and Crawl-delay.
+  "protego>=0.7,<0.8",
   "pydantic-ai-slim[openai]>=2.40,<3",
   "pydantic-settings>=2.13.1,<3",
   # HTML parsing for compaction.

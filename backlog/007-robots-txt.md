@@ -9,11 +9,11 @@ The crawler fetches each host's robots.txt once and caches it on the domain. URL
 
 ## Acceptance criteria
 
-- [ ] The first URL on a host fetches its robots.txt; the domain row stores `robots_txt` and `robots_fetched_at`, and later URLs on that host in the run don't fetch it again.
-- [ ] A URL disallowed for `*` or for `my-bot` gets a `blocked_robots` fetch and no request.
-- [ ] Every request sends the `User-Agent` `my-bot/<version>`.
-- [ ] A host's `Crawl-delay` is stored as `crawl_delay_ms` when it is longer than the 1 s default; otherwise `crawl_delay_ms` is 1000. Saved MERX robots.txt gives 5000.
-- [ ] A host whose robots.txt returns 404 allows every path.
+- [x] The first URL on a host fetches its robots.txt; the domain row stores `robots_txt` and `robots_fetched_at`, and later URLs on that host in the run don't fetch it again.
+- [x] A URL disallowed for `*` or for `my-bot` gets a `blocked_robots` fetch and no request.
+- [x] Every request sends the `User-Agent` `my-bot/<version>`.
+- [x] A host's `Crawl-delay` is stored as `crawl_delay_ms` when it is longer than the 1 s default; otherwise `crawl_delay_ms` is 1000. Saved MERX robots.txt gives 5000.
+- [x] A host whose robots.txt returns 404 allows every path.
 
 ## Notes
 

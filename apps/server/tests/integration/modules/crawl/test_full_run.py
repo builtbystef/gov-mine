@@ -12,8 +12,10 @@ import time
 import uuid
 from collections import Counter
 from contextlib import suppress
+from importlib.metadata import version
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlsplit
 
 import click
 import httpx
@@ -28,6 +30,7 @@ from sqlalchemy.pool import NullPool
 from typer.testing import CliRunner
 
 from gov_mine.cli import app as cli
+from gov_mine.integrations.http import USER_AGENT, create_http_client
 from gov_mine.integrations.storage.memory import MemoryObjectStore
 from gov_mine.main import create_app
 from gov_mine.modules.crawl import service
@@ -94,38 +97,52 @@ def rows(engine: Engine, sql: str, **params: Any) -> list[dict[str, Any]]:
 
 
 class Website:
-    """Serves `pages` (URL to body; a `.pdf` as a PDF, an `.xml` as XML, the rest as HTML,
-    unless `media_types` says otherwise) and 404 for the rest, and notes the run's status as
-    each request arrives."""
+    """Serves `pages` (URL to body; a `.pdf` as a PDF, an `.xml` as XML, a `.txt` as text, the
+    rest as HTML, unless `media_types` says otherwise), the status in `statuses` for a URL listed
+    there, and 404 for the rest. Notes the run's status and the `User-Agent` as each request
+    arrives."""
 
     def __init__(
-        self, pages: dict[str, bytes] | None = None, media_types: dict[str, str] | None = None
+        self,
+        pages: dict[str, bytes] | None = None,
+        media_types: dict[str, str] | None = None,
+        statuses: dict[str, int] | None = None,
     ) -> None:
         self.pages = pages if pages is not None else {"https://createto.ca/": HOMEPAGE}
         self.media_types = media_types or {}
+        self.statuses = statuses or {}
         self.requests: list[str] = []
+        self.user_agents: list[str | None] = []
         self.status_during_fetch: list[str] = []
         self.session_factory: Any = None
 
     async def __call__(self, request: httpx.Request) -> httpx.Response:
         url = str(request.url)
         self.requests.append(url)
+        self.user_agents.append(request.headers.get("User-Agent"))
         async with self.session_factory() as session:
             statuses = await session.scalars(text("SELECT status FROM crawl_runs"))
             self.status_during_fetch.extend(statuses)
+        if url in self.statuses:
+            return httpx.Response(self.statuses[url])
         if url not in self.pages:
             return httpx.Response(404)
         media_type = self.media_types.get(url) or {
             ".pdf": "application/pdf",
             ".xml": "application/xml",
+            ".txt": "text/plain; charset=utf-8",
         }.get(url[url.rfind(".") :], "text/html; charset=utf-8")
         return httpx.Response(200, content=self.pages[url], headers={"Content-Type": media_type})
 
     @property
     def page_requests(self) -> list[str]:
-        """The requests but the one for `/sitemap.xml`, which every run makes first."""
+        """The requests but the one for `/sitemap.xml`, which every run makes first, and the
+        ones for robots.txt."""
         assert self.requests[0] == SITEMAP
-        return self.requests[1:]
+        return [url for url in self.requests[1:] if urlsplit(url).path != "/robots.txt"]
+
+    def robots_requests(self) -> Counter[str]:
+        return Counter(url for url in self.requests if urlsplit(url).path == "/robots.txt")
 
 
 def page(*hrefs: str, script: str = "") -> bytes:
@@ -161,7 +178,7 @@ def fetches_by_url(engine: Engine, run_id: str) -> dict[str, dict[str, Any]]:
 async def start(settings: Settings, run_id: str, website: Website) -> list[dict[str, Any]]:
     """Run `crawl.start` for the run, outside a worker, and return the fetch jobs it queued."""
     async with (
-        httpx.AsyncClient(transport=httpx.MockTransport(website)) as http,
+        create_http_client(httpx.MockTransport(website)) as http,
         build_resources(settings, object_store=MemoryObjectStore(), http=http) as resources,
     ):
         website.session_factory = resources.session
@@ -183,7 +200,7 @@ async def crawl(settings: Settings, run_id: str, website: Website) -> MemoryObje
     """Run a worker until the run is no longer queued or running, and return what it stored."""
     store = MemoryObjectStore()
     async with (
-        httpx.AsyncClient(transport=httpx.MockTransport(website)) as http,
+        create_http_client(httpx.MockTransport(website)) as http,
         build_resources(settings, object_store=store, http=http) as resources,
     ):
         website.session_factory = resources.session
@@ -259,9 +276,10 @@ def test_a_full_run_crawls_the_homepage_into_a_snapshot(crawl_settings: Settings
     store = asyncio.run(crawl(crawl_settings, run_id, website))
 
     # The host has no sitemap (404): the run went on from the homepage, running, then finished.
-    # The sitemap is read inside `crawl.start`, before `running` is committed.
-    assert website.requests == [SITEMAP, "https://createto.ca/"]
-    assert website.status_during_fetch == ["queued", "running"]
+    # The sitemap is read inside `crawl.start`, before `running` is committed. Nor has it a
+    # robots.txt (404): every path is allowed.
+    assert website.requests == [SITEMAP, "https://createto.ca/robots.txt", "https://createto.ca/"]
+    assert website.status_during_fetch == ["queued", "running", "running"]
     (run,) = rows(database, "SELECT * FROM crawl_runs WHERE id = :id", id=run_id)
     assert run["status"] == "finished"
     assert run["started_at"] is not None
@@ -734,3 +752,116 @@ def test_a_host_changed_to_crawl_is_followed_on_the_next_run(
         "https://docs.example/files/a.pdf": "unchanged",
         "https://docs.example/files/b.pdf": "fetched",
     }
+
+
+MERX_ROBOTS = SERVER_ROOT / "fixtures" / "merx" / "robots.txt"
+
+
+def test_each_hosts_robots_txt_is_read_once_and_what_it_disallows_is_not_requested(
+    crawl_settings: Settings, database: Engine
+):
+    run_id = create_run()
+    robots = (
+        "User-agent: *\nDisallow: /private/\n\n"
+        "User-agent: my-bot\nDisallow: /drafts/\nCrawl-delay: 0.5\n\n"
+        "User-agent: other-bot\nDisallow: /\n"
+    )
+    merx = "https://www.merx.com"
+    allowed = [
+        f"{SITE}/",
+        f"{SITE}/about",
+        f"{SITE}/projects",
+        f"{merx}/public/notice.pdf",
+        f"{STORYBLOK}/report.pdf",
+    ]
+    disallowed = [
+        f"{SITE}/private/a",
+        f"{SITE}/private/c",
+        f"{SITE}/drafts/b",
+        f"{merx}/private/contract.pdf",
+    ]
+    website = Website(
+        {
+            f"{SITE}/robots.txt": robots.encode(),
+            f"{merx}/robots.txt": MERX_ROBOTS.read_bytes(),
+            f"{SITE}/": page(
+                "/about",
+                "/private/a",
+                "/drafts/b",
+                "/projects?utm_source=nav",
+                f"{merx}/public/notice.pdf",
+                f"{merx}/private/contract.pdf",
+                f"{STORYBLOK}/report.pdf",
+                "https://news.example/report.pdf",
+            ),
+            f"{SITE}/about": page("/private/c", "/projects"),
+            f"{SITE}/projects": page(),
+            **dict.fromkeys([*disallowed, "https://news.example/report.pdf"], b"%PDF-1.4"),
+            f"{merx}/public/notice.pdf": b"%PDF-1.4",
+            f"{STORYBLOK}/report.pdf": b"%PDF-1.4",
+        },
+        # A robots.txt that cannot be read refuses the whole host.
+        statuses={"https://news.example/robots.txt": 503},
+    )
+
+    asyncio.run(crawl(crawl_settings, run_id, website))
+
+    (run,) = rows(database, "SELECT status FROM crawl_runs")
+    assert run["status"] == "finished"
+    # Each host's robots.txt read once, before the first URL on it; the storyblok host's is a
+    # 404 and allows everything.
+    assert website.robots_requests() == Counter(
+        {
+            f"{SITE}/robots.txt": 1,
+            f"{merx}/robots.txt": 1,
+            "https://a-us.storyblok.com/robots.txt": 1,
+            "https://news.example/robots.txt": 1,
+        }
+    )
+    requests = website.requests
+    assert requests.index(f"{SITE}/robots.txt") < requests.index(f"{SITE}/")
+    assert requests.index(f"{merx}/robots.txt") < requests.index(f"{merx}/public/notice.pdf")
+    # What robots.txt disallows, for * or for my-bot, is never requested.
+    assert sorted(website.page_requests) == sorted(allowed)
+    outcomes = {
+        url: (fetch["outcome"], fetch["reason"], fetch["duration_ms"], fetch["http_status"])
+        for url, fetch in fetches_by_url(database, run_id).items()
+        if fetch["outcome"] != "fetched"
+    }
+    assert outcomes == dict.fromkeys(disallowed, ("blocked_robots", "disallowed", None, None)) | {
+        "https://news.example/report.pdf": ("blocked_robots", "robots_unreachable", None, None)
+    }
+    # The robots cache and the delay on each domain: the longer of 1 s and Crawl-delay.
+    domains = {
+        row["name"]: row
+        for row in rows(
+            database, "SELECT name, robots_txt, robots_fetched_at, crawl_delay_ms FROM domains"
+        )
+    }
+    assert {name: domain["robots_txt"] for name, domain in domains.items()} == {
+        "createto.ca": robots,
+        "www.merx.com": MERX_ROBOTS.read_bytes().decode(),
+        "a-us.storyblok.com": "",
+        "news.example": None,
+    }
+    assert all(domain["robots_fetched_at"] is not None for domain in domains.values())
+    assert {name: domain["crawl_delay_ms"] for name, domain in domains.items()} == {
+        "createto.ca": 1000,
+        "www.merx.com": 5000,
+        "a-us.storyblok.com": 1000,
+        "news.example": 1000,
+    }
+
+
+def test_every_request_identifies_the_crawler_as_my_bot(crawl_settings: Settings):
+    run_id = create_run()
+    website = Website(
+        {f"{SITE}/": page("/about", f"{STORYBLOK}/report.pdf"), f"{SITE}/about": page()}
+    )
+
+    asyncio.run(crawl(crawl_settings, run_id, website))
+
+    assert f"my-bot/{version('gov-mine-server')}" == USER_AGENT
+    # The sitemap, robots.txt of both hosts, both pages and the file.
+    assert len(website.requests) == 6
+    assert set(website.user_agents) == {USER_AGENT}
