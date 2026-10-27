@@ -24,7 +24,7 @@ export function SnapshotDetail({
   /** A cited excerpt to mark on the page. */
   highlight: string | undefined;
 }) {
-  const pageHref = (to: number) =>
+  const pageHref = (to: number): `/snapshots/${string}` =>
     to > 1 ? `/snapshots/${snapshot.id}?page=${to}` : `/snapshots/${snapshot.id}`;
   return (
     <>

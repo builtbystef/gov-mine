@@ -10,7 +10,7 @@ import { formatDateTime } from "@/lib/formatting/dates";
 import { fieldLabel, formatValue, recordTypeLabels } from "../schemas";
 
 /** The snapshot page at the cited page, with the excerpt highlighted. */
-export function citationHref(citation: CitationOutput): string {
+export function citationHref(citation: CitationOutput): `/snapshots/${string}` {
   const search = new URLSearchParams({ page: String(citation.page), highlight: citation.excerpt });
   return `/snapshots/${citation.snapshot_id}?${search.toString()}#excerpt`;
 }
