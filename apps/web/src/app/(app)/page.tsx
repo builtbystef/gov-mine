@@ -7,8 +7,12 @@ import {
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { Logo } from "@/components/shared/logo";
+import { Skeleton } from "@/components/ui/skeleton";
+import { unwrap } from "@/lib/api/errors";
+import { api } from "@/lib/api/server-client";
 
 export const metadata: Metadata = { title: "Overview" };
 
@@ -39,6 +43,28 @@ const sections = [
   },
 ] as const;
 
+/** How many of each there are, from the total of a one-row page of the list. */
+const totals = {
+  "/institutions": async () =>
+    unwrap(await api.GET("/institutions", { params: { query: { limit: 1 } } })).total,
+  "/runs": async () => unwrap(await api.GET("/runs", { params: { query: { limit: 1 } } })).total,
+  "/documents": async () =>
+    unwrap(await api.GET("/documents", { params: { query: { limit: 1 } } })).total,
+  "/records": async () =>
+    unwrap(await api.GET("/records", { params: { query: { limit: 1 } } })).total,
+} as const;
+
+/** A section's total; nothing when the API cannot be reached, so the page still renders. */
+async function Total({ href }: { href: keyof typeof totals }) {
+  const total = await totals[href]().catch(() => null);
+  if (total === null) return null;
+  return (
+    <span className="text-3xl font-semibold tracking-tight tabular-nums">
+      {total.toLocaleString("en-US")}
+    </span>
+  );
+}
+
 export default function HomePage() {
   return (
     <div className="flex flex-col gap-8">
@@ -64,6 +90,9 @@ export default function HomePage() {
             <span className="flex size-10 items-center justify-center rounded-lg bg-secondary text-primary">
               <Icon className="size-5" />
             </span>
+            <Suspense fallback={<Skeleton className="h-9 w-16" />}>
+              <Total href={href} />
+            </Suspense>
             <span className="flex items-center gap-1.5 font-semibold">
               {title}
               <ArrowRightIcon className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
