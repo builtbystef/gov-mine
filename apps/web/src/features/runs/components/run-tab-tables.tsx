@@ -15,7 +15,7 @@ import { createDataTableColumnHelper, DataTable } from "@/components/shared/data
 import { Badge } from "@/components/ui/badge";
 import { browserApi } from "@/lib/api/client";
 import { formatBytes } from "@/lib/formatting/bytes";
-import { formatDateTime } from "@/lib/formatting/dates";
+import { formatCalendarDate, formatDateTime } from "@/lib/formatting/dates";
 import { formatCost } from "@/lib/formatting/numbers";
 import { cn } from "@/lib/utils";
 
@@ -140,9 +140,7 @@ function documentColumns(timeZone: string) {
     documentColumn.accessor("document_date", {
       header: "Date",
       cell: ({ row }) => (
-        <span className="whitespace-nowrap">
-          {formatDateTime(row.original.document_date, timeZone)}
-        </span>
+        <span className="whitespace-nowrap">{formatCalendarDate(row.original.document_date)}</span>
       ),
     }),
   ]);
