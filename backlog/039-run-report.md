@@ -9,9 +9,9 @@ Depends on: 020, 023
 
 ## Acceptance criteria
 
-- [ ] The report gives elapsed time, requests by fetch outcome, files processed and failed (snapshots with `text_status = failed`), snapshots written, documents new and changed, records created and amended, paid calls by purpose, and cost by provider. (All but records created and amended, which wait for 023.)
-- [ ] It lists documents whose webpage went missing in the run (removed), documents left unextracted because their extraction failed, and `fallback_reason` counts per source. (Removed documents done; the other two wait for 023's `extractions`.)
-- [ ] Against a seeded database with known rows, every number equals a hand count of those rows. (True for every number but the three that wait for 023.)
+- [x] The report gives elapsed time, requests by fetch outcome, files processed and failed (snapshots with `text_status = failed`), snapshots written, documents new and changed, records created and amended, paid calls by purpose, and cost by provider.
+- [x] It lists documents whose webpage went missing in the run (removed), documents left unextracted because their extraction failed, and `fallback_reason` counts per source.
+- [x] Against a seeded database with known rows, every number equals a hand count of those rows.
 - [x] `gov-mine run report <id>` prints the report as a markdown table; `--json` prints the same numbers as JSON.
 - [ ] The run page shows the same report from `GET /runs/{id}/report`. (The endpoint exists; the run page is owned by another change.)
 

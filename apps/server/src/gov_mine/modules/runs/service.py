@@ -19,6 +19,7 @@ from gov_mine.modules.crawl.models import (
     Webpage,
 )
 from gov_mine.modules.extract import service as extract
+from gov_mine.modules.extract.models import Extraction, RecordSnapshot
 from gov_mine.modules.ingest import service as ingest
 from gov_mine.modules.ingest.models import TextStatus, WebpageSnapshot
 from gov_mine.modules.institutions import service as institutions
@@ -327,26 +328,61 @@ async def read_webpage(session: AsyncSession, webpage_id: uuid.UUID) -> WebpageO
     )
 
 
-async def _records(_session: AsyncSession, _run_id: uuid.UUID) -> RecordCounts | None:
-    """Records created and amended in the run. TODO(023): wire up once `records` and
-    `record_snapshots` exist: created = records whose first record snapshot's extraction has
-    this `crawl_run_id`, amended = record snapshots of the run's extractions that are not
-    their record's first. Null until then, which the report prints as not available."""
-    return None
+async def _records(session: AsyncSession, run_id: uuid.UUID) -> RecordCounts:
+    """Records created in the run (their first record snapshot is from one of its extractions)
+    and amended (a later record snapshot is)."""
+    ranked = (
+        select(
+            Extraction.crawl_run_id,
+            func.row_number()
+            .over(
+                partition_by=RecordSnapshot.record_id,
+                order_by=(RecordSnapshot.created_at, RecordSnapshot.id),
+            )
+            .label("n"),
+        )
+        .join(Extraction, Extraction.id == RecordSnapshot.extraction_id)
+        .subquery()
+    )
+    created, amended = (
+        await session.execute(
+            select(func.count().filter(ranked.c.n == 1), func.count().filter(ranked.c.n > 1)).where(
+                ranked.c.crawl_run_id == run_id
+            )
+        )
+    ).one()
+    return RecordCounts(created=created, amended=amended)
 
 
-async def _unextracted(_session: AsyncSession, _run_id: uuid.UUID) -> list[uuid.UUID] | None:
-    """Documents left unextracted because their extraction in the run failed. TODO(023): the
-    documents whose webpage snapshot has an `extractions` row of this run with `error` set."""
-    return None
+async def _unextracted(session: AsyncSession, run_id: uuid.UUID) -> list[uuid.UUID]:
+    """Documents left unextracted because an extraction of theirs in the run failed."""
+    return list(
+        await session.scalars(
+            select(Document.id)
+            .distinct()
+            .join(WebpageSnapshot, WebpageSnapshot.webpage_id == Document.webpage_id)
+            .join(Extraction, Extraction.snapshot_id == WebpageSnapshot.id)
+            .where(Extraction.crawl_run_id == run_id, Extraction.error.is_not(None))
+            .order_by(Document.id)
+        )
+    )
 
 
-async def _fallback_reasons(
-    _session: AsyncSession, _run_id: uuid.UUID
-) -> dict[str, dict[str, int]] | None:
-    """`fallback_reason` counts per source. TODO(023): the run's `extractions` with
-    `fallback_reason` set, grouped by their document's `source_id` and the reason."""
-    return None
+async def _fallback_reasons(session: AsyncSession, run_id: uuid.UUID) -> dict[str, dict[str, int]]:
+    """The run's extractions by their document's source (`none` for a document found outside a
+    source) and `fallback_reason`."""
+    counts: dict[str, dict[str, int]] = defaultdict(dict)
+    rows = await session.execute(
+        select(Document.source_id, Extraction.fallback_reason, func.count())
+        .join(WebpageSnapshot, WebpageSnapshot.id == Extraction.snapshot_id)
+        .join(Document, Document.webpage_id == WebpageSnapshot.webpage_id)
+        .where(Extraction.crawl_run_id == run_id, Extraction.fallback_reason.is_not(None))
+        .group_by(Document.source_id, Extraction.fallback_reason)
+        .order_by(Document.source_id.nulls_first(), Extraction.fallback_reason)
+    )
+    for source_id, reason, count in rows:
+        counts["none" if source_id is None else str(source_id)][str(reason)] = count
+    return dict(counts)
 
 
 async def report(session: AsyncSession, run_id: uuid.UUID) -> RunReport:

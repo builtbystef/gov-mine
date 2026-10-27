@@ -2311,7 +2311,7 @@
           "fallback_reasons_by_source"
         ],
         "title": "RunReport",
-        "description": "A run's numbers, each a query over the logs. `elapsed_seconds` is null until the run has\nfinished. `records`, `unextracted_document_ids` and `fallback_reasons_by_source` are null\nwhile extraction (023) does not exist."
+        "description": "A run's numbers, each a query over the logs. `elapsed_seconds` is null until the run has\nfinished. `records`, `unextracted_document_ids` and `fallback_reasons_by_source` have been\ngiven since extraction (023); they stay nullable so the client's types are unchanged."
       },
       "RunSettings": {
         "properties": {

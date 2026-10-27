@@ -3,6 +3,8 @@ from datetime import timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+from sqlalchemy import select
+
 from gov_mine.db.base import utcnow
 from gov_mine.modules.classify.models import Classification, Document
 from gov_mine.modules.crawl.models import (
@@ -13,6 +15,13 @@ from gov_mine.modules.crawl.models import (
     FetchOutcome,
     RunStatus,
     Webpage,
+)
+from gov_mine.modules.extract.models import (
+    Extraction,
+    FallbackReason,
+    Record,
+    RecordSnapshot,
+    RecordType,
 )
 from gov_mine.modules.ingest.models import TextStatus, WebpageSnapshot
 from gov_mine.modules.institutions.models import DocumentType, Institution, InstitutionType
@@ -182,12 +191,94 @@ def test_the_report_counts_the_runs_logs(client: TestClient, db: Database):
         1,
     )
     assert (provider.estimated_cost, provider.reported_cost) == (Decimal("0.012"), Decimal("0.013"))
-    assert report.records is None
+    assert report.records is not None
+    assert (report.records.created, report.records.amended) == (0, 0)
+    assert report.unextracted_document_ids == []
+    assert report.fallback_reasons_by_source == {}
 
     markdown = report_markdown(report)
     assert "| Time taken | 90.0 s |" in markdown
     assert "| Cost, estimated from the price list | $0.012000 |" in markdown
     assert "| Cost, reported by OpenRouter | $0.013000 |" in markdown
+
+
+async def _seed_extractions(db: Database, run_id: uuid.UUID) -> uuid.UUID:
+    """In the run: the new document's record created, the changed one's record (created by the
+    earlier run) amended, and the removed one's extraction failed. Returns the removed one."""
+    async with db.session() as session:
+        run = await session.get_one(CrawlRun, run_id)
+        earlier = await session.scalar(select(CrawlRun).where(CrawlRun.id != run_id))
+        assert earlier is not None
+        documents = {d.title: d for d in await session.scalars(select(Document))}
+
+        async def extraction(
+            in_run: CrawlRun, title: str, reason: FallbackReason, error: str | None = None
+        ) -> Extraction:
+            snapshot = WebpageSnapshot(
+                webpage_id=documents[title].webpage_id,
+                content_hash=uuid.uuid4().hex * 2,
+                media_type="text/html",
+                size_bytes=10,
+                text_status=TextStatus.READY,
+            )
+            session.add(snapshot)
+            await session.flush()
+            row = Extraction(
+                crawl_run_id=in_run.id,
+                snapshot_id=snapshot.id,
+                record_type=RecordType.NEWS_ITEM,
+                extractor="model:news_item@1",
+                fallback_reason=reason,
+                error=error,
+            )
+            session.add(row)
+            await session.flush()
+            return row
+
+        async def record(title: str) -> Record:
+            row = Record(
+                record_type=RecordType.NEWS_ITEM,
+                institution_id=run.institution_id,
+                document_id=documents[title].id,
+                key="",
+            )
+            session.add(row)
+            await session.flush()
+            return row
+
+        def state(row: Record, by: Extraction, headline: str) -> RecordSnapshot:
+            return RecordSnapshot(
+                record_id=row.id, extraction_id=by.id, data={"headline": headline}
+            )
+
+        new, changed = await record("new"), await record("changed")
+        session.add(
+            state(changed, await extraction(earlier, "changed", FallbackReason.NO_RULE), "A")
+        )
+        await session.flush()
+        session.add(state(new, await extraction(run, "new", FallbackReason.NO_RULE), "N"))
+        validation = FallbackReason.VALIDATION_FAILED
+        session.add(state(changed, await extraction(run, "changed", validation), "B"))
+        await extraction(run, "removed", FallbackReason.NO_RULE, error="ModelHTTPError: 502")
+        await session.commit()
+        return documents["removed"].id
+
+
+def test_the_report_counts_records_failed_extractions_and_fallback_reasons(
+    client: TestClient, db: Database
+):
+    run_id = db.run(_seed, db)
+    removed = db.run(_seed_extractions, db, run_id)
+
+    report = RunReport.model_validate(client.get(f"/runs/{run_id}/report").json())
+
+    assert report.records is not None
+    assert (report.records.created, report.records.amended) == (1, 1)
+    assert report.unextracted_document_ids == [removed]
+    assert report.fallback_reasons_by_source == {"none": {"no_rule": 2, "validation_failed": 1}}
+    markdown = report_markdown(report)
+    assert "| Records created | 1 |" in markdown
+    assert "| Records amended | 1 |" in markdown
 
 
 def test_an_unknown_run_has_no_report(client: TestClient):

@@ -812,8 +812,8 @@ export interface components {
         /**
          * RunReport
          * @description A run's numbers, each a query over the logs. `elapsed_seconds` is null until the run has
-         *     finished. `records`, `unextracted_document_ids` and `fallback_reasons_by_source` are null
-         *     while extraction (023) does not exist.
+         *     finished. `records`, `unextracted_document_ids` and `fallback_reasons_by_source` have been
+         *     given since extraction (023); they stay nullable so the client's types are unchanged.
          */
         RunReport: {
             run: components["schemas"]["RunOutput"];
