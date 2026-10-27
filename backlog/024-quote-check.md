@@ -9,11 +9,11 @@ Every citation from a model extraction is checked against the stored text of its
 
 ## Acceptance criteria
 
-- [ ] An excerpt that appears on the cited page, differing only in case, whitespace, typographic quotes or dashes, or markdown syntax, is `verified = true`.
-- [ ] An excerpt that is not on the cited page, or appears only on another page of the same snapshot, is `verified = false`.
-- [ ] An excerpt shorter than twelve characters is `verified = false`.
-- [ ] A match must fall on word boundaries: "port" inside "important" doesn't verify.
-- [ ] An excerpt that only matches once all whitespace is removed (a line break inside a word in a PDF) is `verified = true`.
+- [x] An excerpt that appears on the cited page, differing only in case, whitespace, typographic quotes or dashes, or markdown syntax, is `verified = true`.
+- [x] An excerpt that is not on the cited page, or appears only on another page of the same snapshot, is `verified = false`.
+- [x] An excerpt shorter than twelve characters is `verified = false`.
+- [x] A match must fall on word boundaries: "port" inside "important" doesn't verify.
+- [x] An excerpt that only matches once all whitespace is removed (a line break inside a word in a PDF) is `verified = true`.
 
 ## Notes
 
