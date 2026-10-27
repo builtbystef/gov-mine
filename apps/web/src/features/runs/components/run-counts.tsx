@@ -15,8 +15,8 @@ export function RunCounts({ run: { counts } }: { run: RunOutput }) {
   return (
     <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
       {tiles.map((tile) => (
-        <div key={tile.label} className="rounded-lg border bg-card px-3 py-2.5">
-          <dt className="text-xs text-muted-foreground">{tile.label}</dt>
+        <div key={tile.label} className="rounded-xl border bg-card px-4 py-3 shadow-xs">
+          <dt className="text-xs font-medium text-muted-foreground">{tile.label}</dt>
           <dd
             className={cn("text-xl font-semibold tabular-nums", tile.alert && "text-destructive")}
           >

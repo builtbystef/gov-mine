@@ -13,8 +13,8 @@ function label(value: string): string {
 
 const runStatusVariants: Record<RunStatus, Variant> = {
   queued: "outline",
-  running: "secondary",
-  finished: "default",
+  running: "info",
+  finished: "success",
   failed: "destructive",
   cancelled: "outline",
 };
@@ -26,8 +26,8 @@ export function RunStatusBadge({ status }: { status: RunStatus }) {
 /** Fetched and its kin are what a crawl is for; refusals are neutral; failures stand out. */
 function outcomeVariant(outcome: FetchOutcome): Variant {
   if (outcome.startsWith("failed_")) return "destructive";
-  if (outcome === "fetched") return "default";
-  if (outcome === "not_modified" || outcome === "unchanged") return "secondary";
+  if (outcome === "fetched") return "success";
+  if (outcome === "not_modified" || outcome === "unchanged") return "info";
   return "outline";
 }
 

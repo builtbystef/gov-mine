@@ -115,7 +115,7 @@ function MarkedText({ text, highlight }: { text: string; highlight: string | und
           The excerpt “{highlight}” was not found on this page as written.
         </p>
       )}
-      <pre className="max-h-[70vh] overflow-auto rounded-lg border bg-muted/40 p-4 text-sm whitespace-pre-wrap">
+      <pre className="max-h-[70vh] overflow-auto rounded-xl border bg-card p-4 shadow-xs text-sm whitespace-pre-wrap">
         {at ? (
           <>
             {text.slice(0, at[0])}

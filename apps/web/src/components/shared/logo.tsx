@@ -122,14 +122,11 @@ export function Logo(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-/** The "GOV-MINE" wordmark in the logo face (Barlow Condensed, set in app/layout.tsx). */
+/** The "GovMine" wordmark, the brand half in the primary colour. */
 export function Wordmark({ className, ...props }: HTMLAttributes<HTMLSpanElement>) {
   return (
-    <span
-      className={cn("font-logo leading-none font-semibold tracking-[0.18em] uppercase", className)}
-      {...props}
-    >
-      gov-mine
+    <span className={cn("leading-none font-semibold tracking-tight", className)} {...props}>
+      Gov<span className="text-primary">Mine</span>
     </span>
   );
 }

@@ -53,7 +53,7 @@ export function ActionRow({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-lg border p-4",
+        "flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-xl border bg-card p-4 shadow-xs",
         destructive && "border-destructive/30 bg-destructive/3",
       )}
     >

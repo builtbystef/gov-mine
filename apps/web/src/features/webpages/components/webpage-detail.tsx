@@ -49,7 +49,7 @@ export function WebpageDetail({ webpage, timeZone }: { webpage: WebpageOutput; t
       </dl>
       <section className="mb-8 flex flex-col gap-3">
         <h3 className="text-lg font-semibold">Fetches</h3>
-        <div className="rounded-lg border">
+        <div className="rounded-xl border bg-card shadow-xs">
           <Table>
             <TableHeader>
               <TableRow>
@@ -104,7 +104,7 @@ export function WebpageDetail({ webpage, timeZone }: { webpage: WebpageOutput; t
       </section>
       <section className="flex flex-col gap-3">
         <h3 className="text-lg font-semibold">Snapshots</h3>
-        <div className="rounded-lg border">
+        <div className="rounded-xl border bg-card shadow-xs">
           <Table>
             <TableHeader>
               <TableRow>

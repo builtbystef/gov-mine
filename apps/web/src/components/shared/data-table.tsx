@@ -104,7 +104,7 @@ export function DataTable<TData extends { id: string }>({
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
-      <div className="overflow-x-auto rounded-lg border">
+      <div className="overflow-x-auto rounded-xl border bg-card shadow-xs">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (

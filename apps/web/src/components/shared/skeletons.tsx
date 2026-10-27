@@ -4,7 +4,7 @@ export function TableSkeleton({ rows = 6 }: { rows?: number }) {
   return (
     <div className="flex flex-col gap-3">
       <Skeleton className="h-8 w-64" />
-      <div className="flex flex-col gap-2 rounded-lg border p-3">
+      <div className="flex flex-col gap-2 rounded-xl border bg-card p-3 shadow-xs">
         {Array.from({ length: rows }, (_, i) => (
           <Skeleton key={i} className="h-8 w-full" />
         ))}

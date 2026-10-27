@@ -9,7 +9,9 @@ import { usePathname } from "next/navigation";
  */
 export function PageTitle() {
   const title = titleFor(usePathname());
-  return title ? <h1 className="truncate text-sm font-medium">{title}</h1> : null;
+  return title ? (
+    <h1 className="truncate text-base font-semibold tracking-tight">{title}</h1>
+  ) : null;
 }
 
 /** Sections whose pages are a list and an item: the list's title, then an item's. */
@@ -23,7 +25,7 @@ const listSections: Record<string, [string, string]> = {
 
 export function titleFor(pathname: string): string | null {
   const [section, id, action] = pathname.split("/").filter(Boolean);
-  if (section === undefined) return "Home";
+  if (section === undefined) return "Overview";
   if (section === "institutions") {
     if (id === undefined) return "Institutions";
     if (id === "new") return "Add institution";

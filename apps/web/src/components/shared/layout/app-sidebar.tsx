@@ -1,5 +1,5 @@
-import { ActivityIcon, FileTextIcon, LandmarkIcon, QuoteIcon } from "lucide-react";
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { Logo, Wordmark } from "@/components/shared/logo";
 import {
@@ -13,16 +13,23 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-/** The app's sidebar. Each feature adds its nav group to the content. */
+import { CurrentNavMenu, NavMenu } from "./app-nav";
+
+/** The app's sidebar: the logo, then one link per section, the current one highlighted. */
 export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
+      <SidebarHeader className="border-b py-3">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" tooltip="gov-mine" render={<Link href="/" />}>
-              <Logo className="size-8 shrink-0" />
-              <Wordmark className="text-lg" />
+            <SidebarMenuButton
+              size="lg"
+              tooltip="GovMine"
+              className="gap-3 hover:bg-transparent active:bg-transparent"
+              render={<Link href="/" />}
+            >
+              <Logo className="size-10! shrink-0 group-data-[collapsible=icon]:size-8!" />
+              <Wordmark className="text-xl" />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -30,32 +37,9 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Institutions" render={<Link href="/institutions" />}>
-                  <LandmarkIcon />
-                  <span>Institutions</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Runs" render={<Link href="/runs" />}>
-                  <ActivityIcon />
-                  <span>Runs</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Documents" render={<Link href="/documents" />}>
-                  <FileTextIcon />
-                  <span>Documents</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Records" render={<Link href="/records" />}>
-                  <QuoteIcon />
-                  <span>Records</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
+            <Suspense fallback={<NavMenu pathname={null} />}>
+              <CurrentNavMenu />
+            </Suspense>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>

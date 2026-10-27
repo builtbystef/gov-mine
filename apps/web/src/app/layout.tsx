@@ -18,7 +18,7 @@ const barlow = Barlow_Condensed({
 });
 
 export const metadata: Metadata = {
-  title: { default: "gov-mine", template: "%s · gov-mine" },
+  title: { default: "GovMine", template: "%s · GovMine" },
   description: "Crawls public institutions' websites and extracts cited records",
 };
 
