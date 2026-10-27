@@ -9,11 +9,11 @@ Files are parsed into markdown per page with MarkItDown: a PDF one page at a tim
 
 ## Acceptance criteria
 
-- [ ] A saved Parkdale Hub PDF of N pages produces N text objects, `text/<id>/1` to `text/<id>/N`, with `parser = pdf:markitdown@1` and status `ready`.
-- [ ] A pptx produces one page per slide and an xlsx one page per sheet; a docx produces its text.
-- [ ] A csv or txt file produces one page of its text.
-- [ ] An image snapshot has `text_status = none` and no text objects.
-- [ ] A corrupt PDF ends with `text_status = failed` and `text_error` holding the parser's message; its bytes stay in storage, and the fetch that wrote it stays `fetched`.
+- [x] A saved Parkdale Hub PDF of N pages produces N text objects, `text/<id>/1` to `text/<id>/N`, with `parser = pdf:markitdown@1` and status `ready`.
+- [x] A pptx produces one page per slide and an xlsx one page per sheet; a docx produces its text.
+- [x] A csv or txt file produces one page of its text.
+- [x] An image snapshot has `text_status = none` and no text objects.
+- [x] A corrupt PDF ends with `text_status = failed` and `text_error` holding the parser's message; its bytes stay in storage, and the fetch that wrote it stays `fetched`.
 
 ## Out of scope
 

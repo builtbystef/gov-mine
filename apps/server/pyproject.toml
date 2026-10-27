@@ -32,6 +32,8 @@ dependencies = [
   "sqlalchemy[asyncio]>=2.1.6,<2.2",
   # The CLI.
   "typer>=0.27.3,<0.28",
+  # Splits a PDF into its pages, so MarkItDown reads one page at a time.
+  "pypdfium2>=5.14,<6",
 ]
 
 [dependency-groups]
