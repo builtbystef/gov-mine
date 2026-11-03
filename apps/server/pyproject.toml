@@ -6,7 +6,7 @@ requires-python = ">=3.14"
 license = "MIT"
 authors = [{ name = "builtbystef" }]
 dependencies = [
-  "aiobotocore>=3.9,<4",
+  "aiobotocore>=3.10.0,<4",
   "alembic>=1.19.1,<1.21",
   # Sitemaps are XML from the sites crawled: parsed with entity expansion refused.
   "defusedxml>=0.7.1,<0.8",
